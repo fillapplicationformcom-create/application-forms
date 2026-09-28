@@ -1,0 +1,140 @@
+{
+  "version": "1.0.0",
+  "documentTypes": [
+    {
+      "id": "identity",
+      "name": "Identity Document",
+      "label": "Identity Proof",
+      "description": "Government-issued identity document.",
+      "category": "identity",
+      "required": false,
+      "multiple": false,
+      "acceptedMimeTypes": [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    },
+    {
+      "id": "address",
+      "name": "Address Document",
+      "label": "Address Proof",
+      "description": "Document used to verify residential or mailing address.",
+      "category": "address",
+      "required": false,
+      "multiple": false,
+      "acceptedMimeTypes": [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    },
+    {
+      "id": "photograph",
+      "name": "Photograph",
+      "label": "Photograph",
+      "description": "Recent applicant photograph.",
+      "category": "photo",
+      "required": false,
+      "multiple": false,
+      "acceptedMimeTypes": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    },
+    {
+      "id": "resume",
+      "name": "Resume / CV",
+      "label": "Resume",
+      "description": "Applicant resume or curriculum vitae.",
+      "category": "resume",
+      "required": false,
+      "multiple": false,
+      "acceptedMimeTypes": [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]
+    },
+    {
+      "id": "qualification",
+      "name": "Qualification Document",
+      "label": "Qualification Certificate",
+      "description": "Academic, professional, training or other qualification document.",
+      "category": "qualification",
+      "required": false,
+      "multiple": true,
+      "acceptedMimeTypes": [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    },
+    {
+      "id": "supporting",
+      "name": "Supporting Document",
+      "label": "Supporting Document",
+      "description": "Additional document supporting the application.",
+      "category": "supporting",
+      "required": false,
+      "multiple": true,
+      "acceptedMimeTypes": [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]
+    },
+    {
+      "id": "consent",
+      "name": "Consent / Authorization",
+      "label": "Consent or Authorization Document",
+      "description": "Document containing applicant consent or authorization where applicable.",
+      "category": "consent",
+      "required": false,
+      "multiple": false,
+      "acceptedMimeTypes": [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    },
+    {
+      "id": "other",
+      "name": "Other Document",
+      "label": "Other",
+      "description": "Any other relevant document.",
+      "category": "document",
+      "required": false,
+      "multiple": true,
+      "acceptedMimeTypes": [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]
+    }
+  ],
+
+  "globalRules": {
+    "maximumFileSizeMB": 10,
+    "maximumFilesPerApplication": 20,
+    "allowedMimeTypes": [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ]
+  }
+}

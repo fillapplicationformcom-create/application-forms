@@ -1,0 +1,168 @@
+{
+  "gender": [
+    {
+      "value": "male",
+      "label": "Male"
+    },
+    {
+      "value": "female",
+      "label": "Female"
+    },
+    {
+      "value": "other",
+      "label": "Other"
+    },
+    {
+      "value": "prefer_not_to_say",
+      "label": "Prefer not to say"
+    }
+  ],
+
+  "maritalStatus": [
+    {
+      "value": "single",
+      "label": "Single"
+    },
+    {
+      "value": "married",
+      "label": "Married"
+    },
+    {
+      "value": "divorced",
+      "label": "Divorced"
+    },
+    {
+      "value": "widowed",
+      "label": "Widowed"
+    },
+    {
+      "value": "prefer_not_to_say",
+      "label": "Prefer not to say"
+    }
+  ],
+
+  "employmentStatus": [
+    {
+      "value": "employed",
+      "label": "Employed"
+    },
+    {
+      "value": "self_employed",
+      "label": "Self-employed"
+    },
+    {
+      "value": "student",
+      "label": "Student"
+    },
+    {
+      "value": "unemployed",
+      "label": "Unemployed"
+    },
+    {
+      "value": "retired",
+      "label": "Retired"
+    },
+    {
+      "value": "other",
+      "label": "Other"
+    }
+  ],
+
+  "applicationStatus": [
+    "Submitted",
+    "Under Review",
+    "Documents Required",
+    "Verified",
+    "Approved",
+    "Rejected",
+    "Withdrawn"
+  ],
+
+  "documentCategories": [
+    {
+      "value": "identity",
+      "label": "Identity Document"
+    },
+    {
+      "value": "address",
+      "label": "Address Proof"
+    },
+    {
+      "value": "education",
+      "label": "Educational Document"
+    },
+    {
+      "value": "employment",
+      "label": "Employment Document"
+    },
+    {
+      "value": "financial",
+      "label": "Financial Document"
+    },
+    {
+      "value": "photo",
+      "label": "Photograph"
+    },
+    {
+      "value": "resume",
+      "label": "Resume / CV"
+    },
+    {
+      "value": "other",
+      "label": "Other"
+    }
+  ],
+
+  "accessRequestTypes": [
+    {
+      "value": "wrt",
+      "label": "WRT Authorization"
+    }
+  ],
+
+  "countries": [
+    {
+      "value": "IN",
+      "label": "India"
+    },
+    {
+      "value": "US",
+      "label": "United States"
+    },
+    {
+      "value": "GB",
+      "label": "United Kingdom"
+    },
+    {
+      "value": "CA",
+      "label": "Canada"
+    },
+    {
+      "value": "AU",
+      "label": "Australia"
+    },
+    {
+      "value": "DE",
+      "label": "Germany"
+    },
+    {
+      "value": "AE",
+      "label": "United Arab Emirates"
+    },
+    {
+      "value": "OTHER",
+      "label": "Other"
+    }
+  ],
+
+  "yesNo": [
+    {
+      "value": "yes",
+      "label": "Yes"
+    },
+    {
+      "value": "no",
+      "label": "No"
+    }
+  ]
+}

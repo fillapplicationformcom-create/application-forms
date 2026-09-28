@@ -1,0 +1,35 @@
+# =========================================================
+# Application Form Management System
+# Robots Exclusion Policy
+# =========================================================
+
+User-agent: *
+
+# Public application pages may be crawled.
+Allow: /
+
+# Administrative interface
+Disallow: /admin.html
+Disallow: /admin/
+Disallow: /api/admin/
+Disallow: /api/auth/
+Disallow: /api/applications/
+
+# Private application and authorization endpoints
+Disallow: /api/applications
+Disallow: /api/authorization
+Disallow: /api/files/
+
+# Uploaded/private content
+Disallow: /uploads/
+Disallow: /private/
+Disallow: /data/
+
+# Do not expose internal implementation resources
+Disallow: /server.js
+Disallow: /.env
+Disallow: /.git/
+Disallow: /node_modules/
+
+# Sitemap
+Sitemap: /sitemap.xml

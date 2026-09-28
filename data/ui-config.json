@@ -1,0 +1,113 @@
+{
+  "app": {
+    "name": "Application Form Management System",
+    "shortName": "Application Forms",
+    "version": "1.0.0"
+  },
+
+  "branding": {
+    "title": "Application Form",
+    "subtitle": "Secure Application Management System",
+    "adminLabel": "Admin",
+    "submitLabel": "Submit Application"
+  },
+
+  "form": {
+    "showProgress": true,
+    "showRequiredIndicator": true,
+    "requiredIndicator": "*",
+    "autoSave": false,
+    "confirmBeforeReset": true,
+    "showSubmissionMessage": true
+  },
+
+  "messages": {
+    "loading": "Please wait...",
+    "submitting": "Submitting application...",
+    "success": "Application submitted successfully.",
+    "error": "Something went wrong. Please try again.",
+    "required": "Please complete all required fields.",
+    "invalidFile": "This file type is not supported.",
+    "fileTooLarge": "File exceeds the allowed size.",
+    "noData": "No data available.",
+    "sessionExpired": "Your session has expired. Please sign in again."
+  },
+
+  "pagination": {
+    "defaultPageSize": 20,
+    "adminPageSize": 25,
+    "maximumPageSize": 100,
+    "showPageNumbers": true,
+    "showPreviousNext": true
+  },
+
+  "uploads": {
+    "maxFileSizeMB": 10,
+    "maxFiles": 20,
+    "documentsMaxFiles": 15,
+    "acceptedExtensions": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".pdf",
+      ".doc",
+      ".docx"
+    ],
+    "acceptedMimeTypes": [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ],
+    "showFileSize": true,
+    "showFileType": true,
+    "showUploadProgress": true
+  },
+
+  "dateTime": {
+    "locale": "en-IN",
+    "dateFormat": "DD/MM/YYYY",
+    "timeFormat": "HH:mm",
+    "dateTimeFormat": "DD/MM/YYYY HH:mm",
+    "timeZone": "Asia/Kolkata"
+  },
+
+  "application": {
+    "defaultStatus": "Submitted",
+    "showApplicationId": true,
+    "showStatus": true,
+    "showCreatedDate": true,
+    "showUpdatedDate": true
+  },
+
+  "admin": {
+    "showStatistics": true,
+    "showSearch": true,
+    "showFilters": true,
+    "showExport": true,
+    "showAuditLogs": true,
+    "showFileViewer": true,
+    "showPdfGeneration": true,
+    "showAiAnalysis": true
+  },
+
+  "access": {
+    "authorizationType": "wrt",
+    "requestExpiryMinutes": 30,
+    "showAuthorizationStatus": true
+  },
+
+  "accessibility": {
+    "keyboardNavigation": true,
+    "focusIndicators": true,
+    "reducedMotionSupport": true
+  },
+
+  "network": {
+    "requestTimeoutMs": 30000,
+    "retryAttempts": 2
+  }
+}
