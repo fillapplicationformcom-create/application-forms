@@ -3,243 +3,89 @@
 /*
 ============================================================
 APPLICATION FORM MANAGEMENT SYSTEM
-ADMIN.JS
+APPLICATIONS MODULE
 ============================================================
 
+Path:
+public/assets/js/applications.js
+
 Purpose:
-- Administrator login
-- Session/token management
-- Application listing
-- Application details
-- Status updates
-- File listing/viewing
-- PDF generation
-- WRT authorization requests
-- Audit logs
-- AI analysis
-- Dashboard statistics
+- Submit public applications
+- Handle multipart/form-data
+- Upload photo, resume and documents
+- Load admin applications
+- Search/filter applications
+- View individual applications
+- Update application status
+- Generate application PDF
+- Open uploaded files
+- Request WRT authorization
+- Check WRT authorization status
 
-Backend base:
-Same-origin /api
+Backend:
+Node.js + Express + PostgreSQL
 
-No hard-coded administrator credentials.
+Compatible with:
+- config.js
+- auth.js
+- admin.js
+- dashboard.js
+- ui.js
+- validation.js
+
 ============================================================
 */
 
 (function () {
 
-  const API_BASE = "/api";
+  const API_BASE =
+    window.API_BASE_URL ||
+    window.API_BASE ||
+    "/api";
 
-  const STORAGE_KEYS = {
-    ADMIN_TOKEN: "application_form_admin_token",
-    ADMIN_SESSION: "application_form_admin_session"
-  };
+
+  let applications = [];
+
+  let currentApplication = null;
 
 
   /* ========================================================
-     BASIC HELPERS
+     TOKEN
   ======================================================== */
 
   function getToken() {
 
-    return (
-      localStorage.getItem(
-        STORAGE_KEYS.ADMIN_TOKEN
-      ) || ""
-    );
-
-  }
-
-
-  function setToken(token) {
-
-    if (!token) {
-      return false;
-    }
-
-    localStorage.setItem(
-      STORAGE_KEYS.ADMIN_TOKEN,
-      token
-    );
-
-    localStorage.setItem(
-      STORAGE_KEYS.ADMIN_SESSION,
-      JSON.stringify({
-        loggedIn: true,
-        loggedInAt: new Date().toISOString()
-      })
-    );
-
-    return true;
-
-  }
-
-
-  function clearToken() {
-
-    localStorage.removeItem(
-      STORAGE_KEYS.ADMIN_TOKEN
-    );
-
-    localStorage.removeItem(
-      STORAGE_KEYS.ADMIN_SESSION
-    );
-
-  }
-
-
-  function isLoggedIn() {
-
-    return Boolean(
-      getToken()
-    );
-
-  }
-
-
-  function escapeHtml(value) {
-
     if (
-      value === null ||
-      value === undefined
-    ) {
-      return "";
-    }
-
-    return String(value)
-      .replace(
-        /&/g,
-        "&amp;"
-      )
-      .replace(
-        /</g,
-        "&lt;"
-      )
-      .replace(
-        />/g,
-        "&gt;"
-      )
-      .replace(
-        /"/g,
-        "&quot;"
-      )
-      .replace(
-        /'/g,
-        "&#039;"
-      );
-
-  }
-
-
-  function formatDate(value) {
-
-    if (!value) {
-      return "—";
-    }
-
-    try {
-
-      return new Date(
-        value
-      ).toLocaleString(
-        "en-IN",
-        {
-          dateStyle: "medium",
-          timeStyle: "short"
-        }
-      );
-
-    } catch {
-
-      return String(value);
-
-    }
-
-  }
-
-
-  function formatFileSize(bytes) {
-
-    const size =
-      Number(bytes);
-
-    if (
-      !Number.isFinite(size) ||
-      size <= 0
-    ) {
-      return "0 B";
-    }
-
-    const units = [
-      "B",
-      "KB",
-      "MB",
-      "GB"
-    ];
-
-    let index = 0;
-    let result = size;
-
-    while (
-      result >= 1024 &&
-      index < units.length - 1
-    ) {
-
-      result /= 1024;
-      index++;
-
-    }
-
-    return (
-      result.toFixed(
-        index === 0 ? 0 : 2
-      ) +
-      " " +
-      units[index]
-    );
-
-  }
-
-
-  function notify(
-    message,
-    type = "info"
-  ) {
-
-    if (
-      typeof window.showToast ===
+      typeof window.getAdminToken ===
       "function"
     ) {
 
-      window.showToast(
-        message,
-        type
-      );
-
-      return;
+      return window.getAdminToken();
 
     }
 
 
-    if (
-      typeof window.showNotification ===
-      "function"
-    ) {
-
-      window.showNotification(
-        message,
-        type
-      );
-
-      return;
-
-    }
-
-
-    console.log(
-      `[${type}]`,
-      message
+    return (
+      localStorage.getItem("adminToken") ||
+      sessionStorage.getItem("adminToken") ||
+      ""
     );
+
+  }
+
+
+  /* ========================================================
+     HTML ESCAPE
+  ======================================================== */
+
+  function escapeHTML(value) {
+
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
 
   }
 
@@ -256,97 +102,51 @@ No hard-coded administrator credentials.
     const token =
       getToken();
 
+
     const headers = {
       ...(options.headers || {})
     };
 
 
-    if (
-      options.body &&
-      !(
-        options.body instanceof
-        FormData
-      )
-    ) {
-
-      headers[
-        "Content-Type"
-      ] =
-        "application/json";
-
-    }
-
-
     if (token) {
 
-      headers[
-        "Authorization"
-      ] =
+      headers.Authorization =
         `Bearer ${token}`;
 
     }
 
 
-    let response;
+    if (
+      options.body &&
+      !(options.body instanceof FormData)
+    ) {
 
-
-    try {
-
-      response =
-        await fetch(
-          API_BASE + endpoint,
-          {
-            ...options,
-            headers
-          }
-        );
-
-    } catch(error) {
-
-      throw new Error(
-        "Unable to connect to the application server."
-      );
+      headers["Content-Type"] =
+        "application/json";
 
     }
 
 
-    let data = null;
+    const response =
+      await fetch(
+        `${API_BASE}${endpoint}`,
+        {
+          ...options,
+          headers
+        }
+      );
 
-    const contentType =
-      response.headers.get(
-        "content-type"
-      ) || "";
 
+    let data = {};
 
-    if (
-      contentType.includes(
-        "application/json"
-      )
-    ) {
+    try {
 
-      try {
+      data =
+        await response.json();
 
-        data =
-          await response.json();
+    } catch {
 
-      } catch {
-
-        data = null;
-
-      }
-
-    } else {
-
-      try {
-
-        data =
-          await response.text();
-
-      } catch {
-
-        data = null;
-
-      }
+      data = {};
 
     }
 
@@ -355,26 +155,33 @@ No hard-coded administrator credentials.
       response.status === 401
     ) {
 
-      clearToken();
+      if (
+        typeof window.logoutAdmin ===
+        "function"
+      ) {
 
-      document.dispatchEvent(
-        new CustomEvent(
-          "admin:unauthorized"
-        )
-      );
+        window.logoutAdmin();
+
+      } else {
+
+        localStorage.removeItem(
+          "adminToken"
+        );
+
+        sessionStorage.removeItem(
+          "adminToken"
+        );
+
+      }
 
     }
 
 
     if (!response.ok) {
 
-      const message =
-        data?.error ||
-        data?.message ||
-        `Request failed (${response.status}).`;
-
       throw new Error(
-        message
+        data.error ||
+        "Request failed."
       );
 
     }
@@ -386,510 +193,152 @@ No hard-coded administrator credentials.
 
 
   /* ========================================================
-     LOGIN
+     PUBLIC — SUBMIT APPLICATION
   ======================================================== */
 
-  async function adminLogin(
-    administratorToken
+  async function submitApplication(
+    formOrData,
+    files = {}
   ) {
 
-    const token =
-      String(
-        administratorToken || ""
-      ).trim();
+    const formData =
+      new FormData();
 
 
-    if (!token) {
-
-      throw new Error(
-        "Administrator token is required."
-      );
-
-    }
-
-
-    const data =
-      await apiRequest(
-        "/admin/login",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            token
-          })
-        }
-      );
-
+    /*
+     * If a real HTML form was supplied,
+     * collect all normal form fields.
+     */
 
     if (
-      !data?.success ||
-      !data?.token
+      formOrData instanceof
+      HTMLFormElement
     ) {
 
-      throw new Error(
-        "Administrator login failed."
-      );
-
-    }
+      const form =
+        formOrData;
 
 
-    setToken(
-      data.token
-    );
+      const fields =
+        new FormData(form);
 
 
-    document.dispatchEvent(
-      new CustomEvent(
-        "admin:login",
-        {
-          detail: data
-        }
-      )
-    );
-
-
-    return data;
-
-  }
-
-
-  /* ========================================================
-     LOGOUT
-  ======================================================== */
-
-  async function adminLogout() {
-
-    try {
-
-      if (getToken()) {
-
-        await apiRequest(
-          "/admin/logout",
-          {
-            method: "POST"
-          }
-        );
-
-      }
-
-    } catch(error) {
-
-      console.warn(
-        "Logout request failed:",
-        error.message
-      );
-
-    } finally {
-
-      clearToken();
-
-      document.dispatchEvent(
-        new CustomEvent(
-          "admin:logout"
-        )
-      );
-
-    }
-
-  }
-
-
-  /* ========================================================
-     CHECK SESSION
-  ======================================================== */
-
-  async function checkAdminSession() {
-
-    if (!isLoggedIn()) {
-
-      return {
-        authenticated: false
-      };
-
-    }
-
-
-    try {
-
-      const data =
-        await apiRequest(
-          "/admin/applications",
-          {
-            method: "GET"
-          }
-        );
-
-
-      return {
-        authenticated: true,
-        applications:
-          data?.applications || []
-      };
-
-    } catch(error) {
-
-      if (
-        error.message
-          .toLowerCase()
-          .includes("session")
+      for (
+        const [key, value]
+        of fields.entries()
       ) {
 
-        clearToken();
+        if (
+          value instanceof File
+        ) {
+
+          continue;
+
+        }
+
+
+        formData.append(
+          key,
+          value
+        );
 
       }
-
-      return {
-        authenticated: false,
-        error: error.message
-      };
-
-    }
-
-  }
-
-
-  /* ========================================================
-     APPLICATIONS
-  ======================================================== */
-
-  async function getApplications() {
-
-    const data =
-      await apiRequest(
-        "/admin/applications",
-        {
-          method: "GET"
-        }
-      );
-
-
-    const applications =
-      Array.isArray(
-        data?.applications
-      )
-        ? data.applications
-        : [];
-
-
-    document.dispatchEvent(
-      new CustomEvent(
-        "admin:applications-loaded",
-        {
-          detail: {
-            applications
-          }
-        }
-      )
-    );
-
-
-    return applications;
-
-  }
-
-
-  async function getApplication(
-    applicationId
-  ) {
-
-    if (!applicationId) {
-
-      throw new Error(
-        "Application ID is required."
-      );
-
-    }
-
-
-    const data =
-      await apiRequest(
-        `/admin/applications/${encodeURIComponent(
-          applicationId
-        )}`,
-        {
-          method: "GET"
-        }
-      );
-
-
-    document.dispatchEvent(
-      new CustomEvent(
-        "admin:application-loaded",
-        {
-          detail: data
-        }
-      )
-    );
-
-
-    return data;
-
-  }
-
-
-  /* ========================================================
-     STATUS
-  ======================================================== */
-
-  async function updateApplicationStatus(
-    applicationId,
-    status
-  ) {
-
-    if (!applicationId) {
-
-      throw new Error(
-        "Application ID is required."
-      );
-
-    }
-
-
-    if (!status) {
-
-      throw new Error(
-        "Application status is required."
-      );
-
-    }
-
-
-    const data =
-      await apiRequest(
-        `/admin/applications/${encodeURIComponent(
-          applicationId
-        )}/status`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            status
-          })
-        }
-      );
-
-
-    document.dispatchEvent(
-      new CustomEvent(
-        "admin:status-updated",
-        {
-          detail: data
-        }
-      )
-    );
-
-
-    notify(
-      "Application status updated.",
-      "success"
-    );
-
-
-    return data;
-
-  }
-
-
-  /* ========================================================
-     FILES
-  ======================================================== */
-
-  async function getApplicationFiles(
-    applicationId
-  ) {
-
-    const data =
-      await apiRequest(
-        `/admin/applications/${encodeURIComponent(
-          applicationId
-        )}/files`,
-        {
-          method: "GET"
-        }
-      );
-
-
-    return Array.isArray(
-      data?.files
-    )
-      ? data.files
-      : [];
-
-  }
-
-
-  function getFileUrl(
-    fileId
-  ) {
-
-    return (
-      API_BASE +
-      `/admin/files/${encodeURIComponent(
-        fileId
-      )}`
-    );
-
-  }
-
-
-  function openFile(
-    fileId
-  ) {
-
-    if (!fileId) {
-
-      notify(
-        "File ID is required.",
-        "error"
-      );
-
-      return;
-
-    }
-
-
-    const token =
-      getToken();
-
-
-    if (!token) {
-
-      notify(
-        "Administrator session required.",
-        "error"
-      );
-
-      return;
 
     }
 
 
     /*
-     * Browser navigation cannot safely attach
-     * the Authorization header.
-     *
-     * Fetch the protected file first, then
-     * create a temporary object URL.
+     * If an object was supplied,
+     * send it as applicationData.
      */
 
-    fetch(
-      getFileUrl(fileId),
-      {
-        headers: {
-          Authorization:
-            `Bearer ${token}`
-        }
-      }
-    )
-      .then(
-        async response => {
+    else if (
+      formOrData &&
+      typeof formOrData ===
+      "object"
+    ) {
 
-          if (!response.ok) {
-
-            let message =
-              "Unable to open file.";
-
-            try {
-
-              const data =
-                await response.json();
-
-              message =
-                data?.error ||
-                message;
-
-            } catch {}
-
-            throw new Error(
-              message
-            );
-
-          }
-
-          return response.blob();
-
-        }
-      )
-      .then(
-        blob => {
-
-          const objectUrl =
-            URL.createObjectURL(
-              blob
-            );
-
-
-          window.open(
-            objectUrl,
-            "_blank",
-            "noopener,noreferrer"
-          );
-
-
-          setTimeout(
-            () => {
-
-              URL.revokeObjectURL(
-                objectUrl
-              );
-
-            },
-            60000
-          );
-
-        }
-      )
-      .catch(
-        error => {
-
-          notify(
-            error.message,
-            "error"
-          );
-
-        }
-      );
-
-  }
-
-
-  /* ========================================================
-     PDF
-  ======================================================== */
-
-  function getPdfUrl(
-    applicationId
-  ) {
-
-    return (
-      API_BASE +
-      `/admin/applications/${encodeURIComponent(
-        applicationId
-      )}/pdf`
-    );
-
-  }
-
-
-  async function openApplicationPdf(
-    applicationId
-  ) {
-
-    if (!applicationId) {
-
-      throw new Error(
-        "Application ID is required."
+      formData.append(
+        "data",
+        JSON.stringify(
+          formOrData
+        )
       );
 
     }
 
 
-    const token =
-      getToken();
+    /*
+     * File handling.
+     */
+
+    appendFile(
+      formData,
+      "photo",
+      files.photo ||
+      files.photoFile
+    );
 
 
-    if (!token) {
+    appendFile(
+      formData,
+      "resume",
+      files.resume ||
+      files.resumeFile
+    );
 
-      throw new Error(
-        "Administrator session required."
+
+    appendMultipleFiles(
+      formData,
+      "documents",
+      files.documents
+    );
+
+
+    appendMultipleFiles(
+      formData,
+      "files",
+      files.files
+    );
+
+
+    /*
+     * If a form was supplied, detect
+     * file inputs automatically.
+     */
+
+    if (
+      formOrData instanceof
+      HTMLFormElement
+    ) {
+
+      appendInputFile(
+        formData,
+        formOrData,
+        [
+          "photo",
+          "photoFile"
+        ]
+      );
+
+
+      appendInputFile(
+        formData,
+        formOrData,
+        [
+          "resume",
+          "resumeFile"
+        ]
+      );
+
+
+      appendInputFiles(
+        formData,
+        formOrData,
+        [
+          "documents",
+          "files"
+        ]
       );
 
     }
@@ -897,36 +346,547 @@ No hard-coded administrator credentials.
 
     const response =
       await fetch(
-        getPdfUrl(
-          applicationId
-        ),
+        `${API_BASE}/applications`,
         {
-          headers: {
-            Authorization:
-              `Bearer ${token}`
+          method:
+            "POST",
+
+          body:
+            formData
+        }
+      );
+
+
+    let data = {};
+
+    try {
+
+      data =
+        await response.json();
+
+    } catch {
+
+      data = {};
+
+    }
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        data.error ||
+        "Application submission failed."
+      );
+
+    }
+
+
+    return data;
+
+  }
+
+
+  /* ========================================================
+     FILE HELPERS
+  ======================================================== */
+
+  function appendFile(
+    formData,
+    fieldName,
+    file
+  ) {
+
+    if (
+      file instanceof File
+    ) {
+
+      formData.append(
+        fieldName,
+        file
+      );
+
+    }
+
+  }
+
+
+  function appendMultipleFiles(
+    formData,
+    fieldName,
+    files
+  ) {
+
+    if (!files) {
+      return;
+    }
+
+
+    const list =
+      Array.from(
+        files
+      );
+
+
+    for (
+      const file
+      of list
+    ) {
+
+      if (
+        file instanceof File
+      ) {
+
+        formData.append(
+          fieldName,
+          file
+        );
+
+      }
+
+    }
+
+  }
+
+
+  function appendInputFile(
+    formData,
+    form,
+    names
+  ) {
+
+    for (
+      const name
+      of names
+    ) {
+
+      const input =
+        form.querySelector(
+          `input[name="${CSS.escape(name)}"]`
+        );
+
+
+      if (
+        input &&
+        input.files &&
+        input.files[0]
+      ) {
+
+        formData.append(
+          name,
+          input.files[0]
+        );
+
+        return;
+
+      }
+
+    }
+
+  }
+
+
+  function appendInputFiles(
+    formData,
+    form,
+    names
+  ) {
+
+    for (
+      const name
+      of names
+    ) {
+
+      const input =
+        form.querySelector(
+          `input[name="${CSS.escape(name)}"]`
+        );
+
+
+      if (
+        input &&
+        input.files &&
+        input.files.length
+      ) {
+
+        for (
+          const file
+          of input.files
+        ) {
+
+          formData.append(
+            name,
+            file
+          );
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+  /* ========================================================
+     ADMIN — LOAD ALL APPLICATIONS
+  ======================================================== */
+
+  async function loadApplications() {
+
+    const data =
+      await apiRequest(
+        "/admin/applications"
+      );
+
+
+    applications =
+      Array.isArray(
+        data.applications
+      )
+        ? data.applications
+        : [];
+
+
+    return applications;
+
+  }
+
+
+  /* ========================================================
+     GET APPLICATION
+  ======================================================== */
+
+  async function getApplication(
+    id
+  ) {
+
+    if (!id) {
+
+      throw new Error(
+        "Application ID is required."
+      );
+
+    }
+
+
+    const data =
+      await apiRequest(
+        `/admin/applications/${encodeURIComponent(id)}`
+      );
+
+
+    currentApplication =
+      data.application ||
+      null;
+
+
+    return data;
+
+  }
+
+
+  /* ========================================================
+     GET FILES
+  ======================================================== */
+
+  async function getApplicationFiles(
+    id
+  ) {
+
+    if (!id) {
+
+      throw new Error(
+        "Application ID is required."
+      );
+
+    }
+
+
+    return apiRequest(
+      `/admin/applications/${encodeURIComponent(id)}/files`
+    );
+
+  }
+
+
+  /* ========================================================
+     UPDATE STATUS
+  ======================================================== */
+
+  async function updateApplicationStatus(
+    id,
+    status
+  ) {
+
+    const allowedStatuses = [
+
+      "Submitted",
+
+      "Under Review",
+
+      "Documents Required",
+
+      "Verified",
+
+      "Approved",
+
+      "Rejected",
+
+      "Withdrawn"
+
+    ];
+
+
+    if (
+      !allowedStatuses.includes(
+        status
+      )
+    ) {
+
+      throw new Error(
+        "Invalid application status."
+      );
+
+    }
+
+
+    const data =
+      await apiRequest(
+        `/admin/applications/${encodeURIComponent(id)}/status`,
+        {
+          method:
+            "PATCH",
+
+          body:
+            JSON.stringify({
+              status
+            })
+        }
+      );
+
+
+    /*
+     * Update local cache.
+     */
+
+    const updated =
+      data.application;
+
+
+    if (updated) {
+
+      applications =
+        applications.map(
+          (application) => {
+
+            const same =
+              application.id ===
+                updated.id ||
+              application.application_id ===
+                updated.application_id;
+
+            return same
+              ? {
+                  ...application,
+                  ...updated
+                }
+              : application;
+
           }
+        );
+
+    }
+
+
+    return data;
+
+  }
+
+
+  /* ========================================================
+     GENERATE PDF
+  ======================================================== */
+
+  async function getApplicationPDF(
+    id
+  ) {
+
+    if (!id) {
+
+      throw new Error(
+        "Application ID is required."
+      );
+
+    }
+
+
+    const token =
+      getToken();
+
+
+    const response =
+      await fetch(
+        `${API_BASE}/admin/applications/${encodeURIComponent(id)}/pdf`,
+        {
+          method:
+            "GET",
+
+          headers: token
+            ? {
+                Authorization:
+                  `Bearer ${token}`
+              }
+            : {}
         }
       );
 
 
     if (!response.ok) {
 
-      let message =
-        "Unable to generate PDF.";
+      let error = {};
 
       try {
 
-        const data =
+        error =
           await response.json();
-
-        message =
-          data?.error ||
-          message;
 
       } catch {}
 
       throw new Error(
-        message
+        error.error ||
+        "Unable to generate PDF."
+      );
+
+    }
+
+
+    return response.blob();
+
+  }
+
+
+  async function downloadApplicationPDF(
+    id
+  ) {
+
+    const blob =
+      await getApplicationPDF(
+        id
+      );
+
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
+
+
+    const link =
+      document.createElement(
+        "a"
+      );
+
+
+    link.href =
+      url;
+
+
+    link.download =
+      `${sanitizeFilename(id)}.pdf`;
+
+
+    document.body.appendChild(
+      link
+    );
+
+
+    link.click();
+
+
+    link.remove();
+
+
+    setTimeout(
+      () => {
+        URL.revokeObjectURL(
+          url
+        );
+      },
+      1000
+    );
+
+  }
+
+
+  /* ========================================================
+     VIEW FILE
+  ======================================================== */
+
+  function getFileURL(
+    fileId
+  ) {
+
+    if (!fileId) {
+
+      throw new Error(
+        "File ID is required."
+      );
+
+    }
+
+
+    return (
+      `${API_BASE}/admin/files/${encodeURIComponent(fileId)}`
+    );
+
+  }
+
+
+  async function openFile(
+    fileId
+  ) {
+
+    const token =
+      getToken();
+
+
+    /*
+     * Browser navigation cannot reliably
+     * attach Authorization headers.
+     *
+     * Fetch the protected file first,
+     * then open a Blob URL.
+     */
+
+    const response =
+      await fetch(
+        getFileURL(fileId),
+        {
+          headers: token
+            ? {
+                Authorization:
+                  `Bearer ${token}`
+              }
+            : {}
+        }
+      );
+
+
+    if (!response.ok) {
+
+      let error = {};
+
+      try {
+
+        error =
+          await response.json();
+
+      } catch {}
+
+
+      throw new Error(
+        error.error ||
+        "Unable to open file."
       );
 
     }
@@ -936,14 +896,14 @@ No hard-coded administrator credentials.
       await response.blob();
 
 
-    const objectUrl =
+    const url =
       URL.createObjectURL(
         blob
       );
 
 
     window.open(
-      objectUrl,
+      url,
       "_blank",
       "noopener,noreferrer"
     );
@@ -951,31 +911,26 @@ No hard-coded administrator credentials.
 
     setTimeout(
       () => {
-
         URL.revokeObjectURL(
-          objectUrl
+          url
         );
-
       },
       60000
     );
-
-
-    return true;
 
   }
 
 
   /* ========================================================
-     WRT ACCESS REQUEST
+     WRT — CREATE ACCESS REQUEST
   ======================================================== */
 
   async function createAccessRequest(
-    applicationId,
+    id,
     type = "wrt"
   ) {
 
-    if (!applicationId) {
+    if (!id) {
 
       throw new Error(
         "Application ID is required."
@@ -984,251 +939,149 @@ No hard-coded administrator credentials.
     }
 
 
-    const data =
-      await apiRequest(
-        `/admin/applications/${encodeURIComponent(
-          applicationId
-        )}/access-request`,
-        {
-          method: "POST",
-          body: JSON.stringify({
+    return apiRequest(
+      `/admin/applications/${encodeURIComponent(id)}/access-request`,
+      {
+        method:
+          "POST",
+
+        body:
+          JSON.stringify({
             type
           })
-        }
-      );
-
-
-    document.dispatchEvent(
-      new CustomEvent(
-        "admin:access-request-created",
-        {
-          detail: data
-        }
-      )
+      }
     );
 
-
-    return data;
-
   }
 
+
+  /* ========================================================
+     WRT — GET ACCESS STATUS
+  ======================================================== */
 
   async function getAccessStatus(
-    applicationId
+    id
   ) {
 
-    const data =
-      await apiRequest(
-        `/admin/applications/${encodeURIComponent(
-          applicationId
-        )}/access-status`,
-        {
-          method: "GET"
-        }
-      );
-
-
-    return data;
-
-  }
-
-
-  async function approveAccess(
-    requestId
-  ) {
-
-    const data =
-      await apiRequest(
-        `/admin/access-requests/${encodeURIComponent(
-          requestId
-        )}/approve`,
-        {
-          method: "PATCH"
-        }
-      );
-
-
-    return data;
-
-  }
-
-
-  async function denyAccess(
-    requestId
-  ) {
-
-    const data =
-      await apiRequest(
-        `/admin/access-requests/${encodeURIComponent(
-          requestId
-        )}/deny`,
-        {
-          method: "PATCH"
-        }
-      );
-
-
-    return data;
-
-  }
-
-
-  /* ========================================================
-     AUDIT LOGS
-  ======================================================== */
-
-  async function getAuditLogs() {
-
-    const data =
-      await apiRequest(
-        "/admin/audit-logs",
-        {
-          method: "GET"
-        }
-      );
-
-
-    return Array.isArray(
-      data?.logs
-    )
-      ? data.logs
-      : [];
-
-  }
-
-
-  /* ========================================================
-     AI ANALYSIS
-  ======================================================== */
-
-  async function analyzeWithAI(
-    input
-  ) {
-
-    if (
-      !input ||
-      typeof input !== "string"
-    ) {
+    if (!id) {
 
       throw new Error(
-        "AI input is required."
+        "Application ID is required."
       );
 
     }
 
 
-    const data =
-      await apiRequest(
-        "/admin/ai/analyze",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            input
-          })
-        }
-      );
-
-
-    return data;
+    return apiRequest(
+      `/admin/applications/${encodeURIComponent(id)}/access-status`
+    );
 
   }
 
 
   /* ========================================================
-     DASHBOARD STATISTICS
+     WRT — ADMIN APPROVE
   ======================================================== */
 
-  function calculateStatistics(
-    applications
+  async function approveAccessRequest(
+    requestId
   ) {
 
-    const list =
-      Array.isArray(
-        applications
-      )
-        ? applications
-        : [];
-
-
-    const statistics = {
-
-      total:
-        list.length,
-
-      submitted:
-        0,
-
-      underReview:
-        0,
-
-      documentsRequired:
-        0,
-
-      verified:
-        0,
-
-      approved:
-        0,
-
-      rejected:
-        0,
-
-      withdrawn:
-        0
-
-    };
-
-
-    list.forEach(
-      application => {
-
-        const status =
-          String(
-            application?.status ||
-            ""
-          ).trim();
-
-
-        switch(status) {
-
-          case "Submitted":
-            statistics.submitted++;
-            break;
-
-          case "Under Review":
-            statistics.underReview++;
-            break;
-
-          case "Documents Required":
-            statistics.documentsRequired++;
-            break;
-
-          case "Verified":
-            statistics.verified++;
-            break;
-
-          case "Approved":
-            statistics.approved++;
-            break;
-
-          case "Rejected":
-            statistics.rejected++;
-            break;
-
-          case "Withdrawn":
-            statistics.withdrawn++;
-            break;
-
-          default:
-            break;
-
-        }
-
+    return apiRequest(
+      `/admin/access-requests/${encodeURIComponent(requestId)}/approve`,
+      {
+        method:
+          "PATCH"
       }
     );
 
+  }
 
-    return statistics;
+
+  /* ========================================================
+     WRT — ADMIN DENY
+  ======================================================== */
+
+  async function denyAccessRequest(
+    requestId
+  ) {
+
+    return apiRequest(
+      `/admin/access-requests/${encodeURIComponent(requestId)}/deny`,
+      {
+        method:
+          "PATCH"
+      }
+    );
+
+  }
+
+
+  /* ========================================================
+     SEARCH
+  ======================================================== */
+
+  function searchApplications(
+    searchTerm,
+    status = ""
+  ) {
+
+    const term =
+      String(
+        searchTerm || ""
+      )
+      .trim()
+      .toLowerCase();
+
+
+    const statusFilter =
+      String(
+        status || ""
+      )
+      .trim();
+
+
+    return applications.filter(
+      (application) => {
+
+        const data =
+          application.applicant_data ||
+          {};
+
+
+        const searchable =
+          JSON.stringify({
+            applicationId:
+              application.application_id,
+
+            status:
+              application.status,
+
+            data
+          })
+          .toLowerCase();
+
+
+        const matchesSearch =
+          !term ||
+          searchable.includes(
+            term
+          );
+
+
+        const matchesStatus =
+          !statusFilter ||
+          application.status ===
+            statusFilter;
+
+
+        return (
+          matchesSearch &&
+          matchesStatus
+        );
+
+      }
+    );
 
   }
 
@@ -1238,32 +1091,39 @@ No hard-coded administrator credentials.
   ======================================================== */
 
   function renderApplications(
-    container,
-    applications
+    list,
+    container
   ) {
 
     if (
-      !container
+      typeof container ===
+      "string"
     ) {
 
-      return;
+      container =
+        document.querySelector(
+          container
+        );
 
     }
 
 
-    const list =
-      Array.isArray(
-        applications
-      )
-        ? applications
-        : [];
+    if (!container) {
+      return;
+    }
 
 
-    if (list.length === 0) {
+    if (
+      !Array.isArray(list) ||
+      list.length === 0
+    ) {
 
       container.innerHTML = `
-        <div class="admin-empty-state">
-          <p>No applications found.</p>
+        <div class="empty-state">
+          <strong>No applications found</strong>
+          <span>
+            There are no applications matching the current filters.
+          </span>
         </div>
       `;
 
@@ -1272,230 +1132,356 @@ No hard-coded administrator credentials.
     }
 
 
-    container.innerHTML = `
+    container.innerHTML =
+      list.map(
+        (application) => {
 
-      <div class="admin-table-wrapper">
-
-        <table class="admin-applications-table">
-
-          <thead>
-
-            <tr>
-
-              <th>Application ID</th>
-
-              <th>Status</th>
-
-              <th>Created</th>
-
-              <th>Updated</th>
-
-              <th>Actions</th>
-
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            ${list.map(
-              application => {
-
-                return `
-
-                  <tr
-                    data-application-id="${escapeHtml(
-                      application.id ||
-                      application.application_id
-                    )}"
-                  >
-
-                    <td>
-                      <strong>
-                        ${escapeHtml(
-                          application.application_id
-                        )}
-                      </strong>
-                    </td>
-
-                    <td>
-
-                      <span
-                        class="application-status status-${String(
-                          application.status || ""
-                        )
-                          .toLowerCase()
-                          .replace(
-                            /[^a-z0-9]+/g,
-                            "-"
-                          )}"
-                      >
-                        ${escapeHtml(
-                          application.status
-                        )}
-                      </span>
-
-                    </td>
-
-                    <td>
-                      ${escapeHtml(
-                        formatDate(
-                          application.created_at
-                        )
-                      )}
-                    </td>
-
-                    <td>
-                      ${escapeHtml(
-                        formatDate(
-                          application.updated_at
-                        )
-                      )}
-                    </td>
-
-                    <td>
-
-                      <button
-                        type="button"
-                        class="admin-view-application"
-                        data-id="${escapeHtml(
-                          application.id ||
-                          application.application_id
-                        )}"
-                      >
-                        View
-                      </button>
-
-                    </td>
-
-                  </tr>
-
-                `;
-
-              }
-            ).join("")}
-
-          </tbody>
-
-        </table>
-
-      </div>
-
-    `;
+          const data =
+            application.applicant_data ||
+            {};
 
 
-    container
-      .querySelectorAll(
-        ".admin-view-application"
-      )
-      .forEach(
-        button => {
+          const name =
+            data.name ||
+            data.fullName ||
+            data.full_name ||
+            data.applicantName ||
+            "Unnamed Applicant";
 
-          button.addEventListener(
-            "click",
-            () => {
 
-              document.dispatchEvent(
-                new CustomEvent(
-                  "admin:view-application",
-                  {
-                    detail: {
-                      id:
-                        button.dataset.id
-                    }
-                  }
-                )
+          const email =
+            data.email ||
+            data.emailAddress ||
+            "—";
+
+
+          const status =
+            application.status ||
+            "Submitted";
+
+
+          const statusClass =
+            String(status)
+              .toLowerCase()
+              .replace(
+                /[^a-z0-9]+/g,
+                "-"
               );
 
-            }
-          );
+
+          return `
+            <tr
+              data-application-id="${escapeHTML(
+                application.application_id
+              )}"
+            >
+
+              <td>
+                ${escapeHTML(
+                  application.application_id
+                )}
+              </td>
+
+              <td>
+                <strong>
+                  ${escapeHTML(name)}
+                </strong>
+
+                <small>
+                  ${escapeHTML(email)}
+                </small>
+              </td>
+
+              <td>
+                <span
+                  class="status-badge status-${escapeHTML(
+                    statusClass
+                  )}"
+                >
+                  ${escapeHTML(status)}
+                </span>
+              </td>
+
+              <td>
+                ${escapeHTML(
+                  formatDate(
+                    application.created_at
+                  )
+                )}
+              </td>
+
+              <td>
+
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  data-view-application="${escapeHTML(
+                    application.application_id
+                  )}"
+                >
+                  View
+                </button>
+
+              </td>
+
+            </tr>
+          `;
 
         }
+      )
+      .join("");
+
+  }
+
+
+  /* ========================================================
+     DATE FORMAT
+  ======================================================== */
+
+  function formatDate(
+    value
+  ) {
+
+    if (!value) {
+      return "—";
+    }
+
+
+    const date =
+      new Date(value);
+
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+
+      return "—";
+
+    }
+
+
+    return date.toLocaleString(
+      "en-IN",
+      {
+        dateStyle:
+          "medium",
+
+        timeStyle:
+          "short"
+      }
+    );
+
+  }
+
+
+  /* ========================================================
+     SANITIZE FILENAME
+  ======================================================== */
+
+  function sanitizeFilename(
+    value
+  ) {
+
+    return String(
+      value || "application"
+    )
+      .replace(
+        /[^a-zA-Z0-9._-]/g,
+        "_"
       );
 
   }
 
 
   /* ========================================================
-     RENDER STATISTICS
+     APPLICATION DETAILS RENDERER
   ======================================================== */
 
-  function renderStatistics(
-    container,
-    statistics
+  function renderApplicationDetails(
+    data,
+    container
   ) {
+
+    if (
+      typeof container ===
+      "string"
+    ) {
+
+      container =
+        document.querySelector(
+          container
+        );
+
+    }
+
 
     if (!container) {
       return;
     }
 
 
-    const stats =
-      statistics ||
+    const application =
+      data.application ||
+      data;
+
+
+    if (!application) {
+
+      container.innerHTML = `
+        <div class="empty-state">
+          Application not found.
+        </div>
+      `;
+
+      return;
+
+    }
+
+
+    const applicantData =
+      application.applicant_data ||
       {};
+
+
+    const entries =
+      Object.entries(
+        applicantData
+      );
+
+
+    const fields =
+      entries.map(
+        ([key, value]) => {
+
+          let displayValue = "";
+
+
+          if (
+            value === null ||
+            value === undefined
+          ) {
+
+            displayValue =
+              "—";
+
+          } else if (
+            typeof value ===
+            "object"
+          ) {
+
+            try {
+
+              displayValue =
+                JSON.stringify(
+                  value
+                );
+
+            } catch {
+
+              displayValue =
+                "[Object]";
+
+            }
+
+          } else {
+
+            displayValue =
+              String(value);
+
+          }
+
+
+          return `
+            <div class="application-field">
+
+              <span class="field-label">
+                ${escapeHTML(key)}
+              </span>
+
+              <strong class="field-value">
+                ${escapeHTML(
+                  displayValue
+                )}
+              </strong>
+
+            </div>
+          `;
+
+        }
+      )
+      .join("");
 
 
     container.innerHTML = `
 
-      <div class="admin-stat-grid">
+      <section class="application-details">
 
-        <div class="admin-stat-card">
-          <span>Total</span>
-          <strong>${Number(
-            stats.total || 0
-          )}</strong>
+        <div class="application-header">
+
+          <div>
+
+            <span class="field-label">
+              Application ID
+            </span>
+
+            <h2>
+              ${escapeHTML(
+                application.application_id
+              )}
+            </h2>
+
+          </div>
+
+
+          <div>
+
+            <span class="status-badge">
+              ${escapeHTML(
+                application.status
+              )}
+            </span>
+
+          </div>
+
         </div>
 
-        <div class="admin-stat-card">
-          <span>Submitted</span>
-          <strong>${Number(
-            stats.submitted || 0
-          )}</strong>
+
+        <div class="application-meta">
+
+          <div>
+            <span>Submitted</span>
+            <strong>
+              ${escapeHTML(
+                formatDate(
+                  application.created_at
+                )
+              )}
+            </strong>
+          </div>
+
+          <div>
+            <span>Updated</span>
+            <strong>
+              ${escapeHTML(
+                formatDate(
+                  application.updated_at
+                )
+              )}
+            </strong>
+          </div>
+
         </div>
 
-        <div class="admin-stat-card">
-          <span>Under Review</span>
-          <strong>${Number(
-            stats.underReview || 0
-          )}</strong>
+
+        <div class="application-fields">
+
+          ${fields}
+
         </div>
 
-        <div class="admin-stat-card">
-          <span>Documents Required</span>
-          <strong>${Number(
-            stats.documentsRequired || 0
-          )}</strong>
-        </div>
-
-        <div class="admin-stat-card">
-          <span>Verified</span>
-          <strong>${Number(
-            stats.verified || 0
-          )}</strong>
-        </div>
-
-        <div class="admin-stat-card">
-          <span>Approved</span>
-          <strong>${Number(
-            stats.approved || 0
-          )}</strong>
-        </div>
-
-        <div class="admin-stat-card">
-          <span>Rejected</span>
-          <strong>${Number(
-            stats.rejected || 0
-          )}</strong>
-        </div>
-
-        <div class="admin-stat-card">
-          <span>Withdrawn</span>
-          <strong>${Number(
-            stats.withdrawn || 0
-          )}</strong>
-        </div>
-
-      </div>
+      </section>
 
     `;
 
@@ -1503,118 +1489,242 @@ No hard-coded administrator credentials.
 
 
   /* ========================================================
-     GLOBAL EXPORT
+     STATUS OPTIONS
   ======================================================== */
 
-  window.ApplicationAdmin = {
+  function getStatusOptions(
+    selected
+  ) {
 
-    API_BASE,
+    const statuses = [
 
-    getToken,
+      "Submitted",
 
-    setToken,
+      "Under Review",
 
-    clearToken,
+      "Documents Required",
 
-    isLoggedIn,
+      "Verified",
 
-    adminLogin,
+      "Approved",
 
-    adminLogout,
+      "Rejected",
 
-    checkAdminSession,
+      "Withdrawn"
 
-    getApplications,
+    ];
 
-    getApplication,
 
-    updateApplicationStatus,
+    return statuses
+      .map(
+        (status) => `
 
-    getApplicationFiles,
+          <option
+            value="${escapeHTML(status)}"
+            ${
+              status === selected
+                ? "selected"
+                : ""
+            }
+          >
+            ${escapeHTML(status)}
+          </option>
 
-    getFileUrl,
+        `
+      )
+      .join("");
+
+  }
+
+
+  /* ========================================================
+     APPLICATION EVENT BINDING
+  ======================================================== */
+
+  function bindApplicationEvents() {
+
+    document.addEventListener(
+      "click",
+      async (event) => {
+
+        const viewButton =
+          event.target.closest(
+            "[data-view-application]"
+          );
+
+
+        if (!viewButton) {
+          return;
+        }
+
+
+        const id =
+          viewButton.dataset
+            .viewApplication;
+
+
+        if (
+          typeof window.openApplication ===
+          "function"
+        ) {
+
+          window.openApplication(
+            id
+          );
+
+          return;
+
+        }
+
+
+        try {
+
+          const data =
+            await getApplication(
+              id
+            );
+
+
+          const container =
+            document.querySelector(
+              "#applicationDetails"
+            );
+
+
+          renderApplicationDetails(
+            data,
+            container
+          );
+
+        } catch(error) {
+
+          console.error(
+            error
+          );
+
+          alert(
+            error.message
+          );
+
+        }
+
+      }
+    );
+
+  }
+
+
+  /* ========================================================
+     PUBLIC API
+  ======================================================== */
+
+  window.applications = {
+
+    submit:
+      submitApplication,
+
+    load:
+      loadApplications,
+
+    get:
+      getApplication,
+
+    getFiles:
+      getApplicationFiles,
+
+    updateStatus:
+      updateApplicationStatus,
+
+    getPDF:
+      getApplicationPDF,
+
+    downloadPDF:
+      downloadApplicationPDF,
 
     openFile,
-
-    getPdfUrl,
-
-    openApplicationPdf,
 
     createAccessRequest,
 
     getAccessStatus,
 
-    approveAccess,
+    approveAccessRequest,
 
-    denyAccess,
+    denyAccessRequest,
 
-    getAuditLogs,
+    search:
+      searchApplications,
 
-    analyzeWithAI,
+    render:
+      renderApplications,
 
-    calculateStatistics,
+    renderDetails:
+      renderApplicationDetails,
 
-    renderApplications,
+    getStatusOptions,
 
-    renderStatistics,
+    getCurrent:
+      () => currentApplication,
 
-    formatDate,
-
-    formatFileSize,
-
-    escapeHtml
+    getAll:
+      () => applications.slice()
 
   };
 
 
-  /* ========================================================
-     OPTIONAL GLOBAL ALIASES
-  ======================================================== */
+  /*
+   * Global compatibility functions.
+   */
 
-  window.adminLogin =
-    adminLogin;
-
-  window.adminLogout =
-    adminLogout;
+  window.submitApplication =
+    submitApplication;
 
   window.loadApplications =
-    getApplications;
+    loadApplications;
 
-  window.loadApplication =
+  window.getApplication =
     getApplication;
 
   window.updateApplicationStatus =
     updateApplicationStatus;
 
+  window.downloadApplicationPDF =
+    downloadApplicationPDF;
+
   window.openApplicationFile =
     openFile;
 
-  window.openApplicationPDF =
-    openApplicationPdf;
+  window.createAccessRequest =
+    createAccessRequest;
+
+  window.getAccessStatus =
+    getAccessStatus;
 
 
   /* ========================================================
      INITIALIZATION
   ======================================================== */
 
-  document.addEventListener(
-    "DOMContentLoaded",
-    () => {
+  function initialize() {
 
-      document.dispatchEvent(
-        new CustomEvent(
-          "admin:ready",
-          {
-            detail: {
-              authenticated:
-                isLoggedIn()
-            }
-          }
-        )
-      );
+    bindApplicationEvents();
 
-    }
-  );
+  }
 
+
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      initialize
+    );
+
+  } else {
+
+    initialize();
+
+  }
 
 })();
