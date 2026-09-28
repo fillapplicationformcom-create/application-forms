@@ -11,19 +11,19 @@ permissions:
   contents: write
 
 concurrency:
-  group: github-pages
+  group: application-forms-pages
   cancel-in-progress: true
 
 jobs:
 
   build:
     name: Build Website
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Prepare website
         shell: bash
@@ -33,7 +33,7 @@ jobs:
           rm -rf _site
           mkdir -p _site
 
-          echo "Preparing public website..."
+          echo "Preparing Application Forms website..."
 
           cp -R public/. _site/
 
@@ -45,30 +45,37 @@ jobs:
 
           touch _site/.nojekyll
 
-          echo "Website files:"
+          echo "Deployment files:"
           find _site -maxdepth 3 -type f | sort
 
-      - name: Verify index
+      - name: Verify website
         shell: bash
         run: |
+          set -e
+
           if [ ! -f "_site/index.html" ]; then
-            echo "ERROR: _site/index.html was not found."
+            echo "ERROR: index.html is missing."
             exit 1
           fi
 
-          echo "index.html found successfully."
+          if [ ! -f "_site/admin.html" ]; then
+            echo "ERROR: admin.html is missing."
+            exit 1
+          fi
+
+          echo "Website verification successful."
 
   deploy:
-    name: Deploy to GitHub Pages
-    runs-on: ubuntu-latest
+    name: Deploy Website
+    runs-on: ubuntu-24.04
     needs: build
 
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Prepare deployment files
+      - name: Prepare deployment
         shell: bash
         run: |
           set -e
@@ -85,7 +92,7 @@ jobs:
 
           touch _site/.nojekyll
 
-      - name: Deploy gh-pages branch
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
