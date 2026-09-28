@@ -1,28 +1,27 @@
 "use strict";
 
 /*
-===========================================================
- APPLICATION FORM MANAGEMENT SYSTEM
- Backend / REST API
+============================================================
+APPLICATION FORM MANAGEMENT SYSTEM
+============================================================
 
- Stack:
- - Node.js
- - Express
- - PostgreSQL
- - Multer
- - JWT
- - PDFKit
+Backend:
+- Node.js 20+
+- Express
+- PostgreSQL
+- Multer
+- JWT
+- PDFKit
+- WRT / explicit authorization
+- Audit logging
+- AI API integration point
+- Secure admin APIs
 
- Main responsibilities:
- - Application submission
- - PostgreSQL storage
- - File uploads
- - Administrator authentication
- - Protected admin APIs
- - PDF generation
- - WRT / explicit authorization
- - Health checking
-===========================================================
+IMPORTANT:
+This file is the single canonical backend file.
+Do not create another server.js.
+
+============================================================
 */
 
 require("dotenv").config();
@@ -52,25 +51,42 @@ const NODE_ENV =
   process.env.NODE_ENV || "development";
 
 const DATABASE_URL =
-  process.env.DATABASE_URL;
+  process.env.DATABASE_URL || "";
 
 const ADMIN_TOKEN =
-  process.env.ADMIN_TOKEN;
+  process.env.ADMIN_TOKEN || "";
 
 const SESSION_SECRET =
-  process.env.SESSION_SECRET ||
-  crypto.randomBytes(48).toString("hex");
+  process.env.SESSION_SECRET || "";
+
+const AI_API_KEY =
+  process.env.AI_API_KEY || "";
+
+const AI_API_URL =
+  process.env.AI_API_URL ||
+  "https://api.openai.com/v1/chat/completions";
+
+const AI_MODEL =
+  process.env.AI_MODEL ||
+  "gpt-4o-mini";
 
 
-/*
- * Render/PostgreSQL normally provides DATABASE_URL.
- */
 if (!DATABASE_URL) {
-
   console.error(
-    "ERROR: DATABASE_URL environment variable is missing."
+    "WARNING: DATABASE_URL is not configured."
   );
+}
 
+if (!ADMIN_TOKEN) {
+  console.error(
+    "WARNING: ADMIN_TOKEN is not configured."
+  );
+}
+
+if (!SESSION_SECRET) {
+  console.error(
+    "WARNING: SESSION_SECRET is not configured."
+  );
 }
 
 
@@ -103,7 +119,7 @@ const RESUMES_DIR =
   PHOTOS_DIR,
   DOCUMENTS_DIR,
   RESUMES_DIR
-].forEach(directory => {
+].forEach((directory) => {
 
   fs.mkdirSync(
     directory,
@@ -130,23 +146,98 @@ const pool =
             ? {
                 rejectUnauthorized: false
               }
-            : false
+            : false,
+
+        max: 10,
+
+        idleTimeoutMillis:
+          30000,
+
+        connectionTimeoutMillis:
+          10000
       })
     : null;
 
 
 /* =========================================================
-   EXPRESS CONFIGURATION
+   EXPRESS
 ========================================================= */
 
 app.disable("x-powered-by");
 
+/*
+ * Required when deployed behind Render's proxy.
+ */
+if (NODE_ENV === "production") {
+  app.set(
+    "trust proxy",
+    1
+  );
+}
+
+
+/* =========================================================
+   CORS
+========================================================= */
+
+const allowedOrigins =
+  (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+
+      /*
+       * Allow non-browser/server requests.
+       */
+      if (!origin) {
+        return callback(
+          null,
+          true
+        );
+      }
+
+      /*
+       * Development convenience.
+       */
+      if (
+        NODE_ENV !== "production" &&
+        allowedOrigins.length === 0
+      ) {
+        return callback(
+          null,
+          true
+        );
+      }
+
+      if (
+        allowedOrigins.includes(origin)
+      ) {
+        return callback(
+          null,
+          true
+        );
+      }
+
+      return callback(
+        new Error(
+          "Origin not allowed by CORS."
+        )
+      );
+    },
+
     credentials: false
   })
 );
+
+
+/* =========================================================
+   BODY PARSERS
+========================================================= */
 
 app.use(
   express.json({
@@ -184,22 +275,33 @@ app.use(
       "strict-origin-when-cross-origin"
     );
 
+    res.setHeader(
+      "Permissions-Policy",
+      "camera=(), microphone=(), geolocation=()"
+    );
+
     next();
+
   }
 );
 
 
 /* =========================================================
-   RATE LIMITERS
+   RATE LIMITING
 ========================================================= */
 
 const loginLimiter =
   rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs:
+      15 * 60 * 1000,
+
     max: 20,
 
-    standardHeaders: true,
-    legacyHeaders: false,
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false,
 
     message: {
       error:
@@ -210,15 +312,40 @@ const loginLimiter =
 
 const applicationLimiter =
   rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs:
+      15 * 60 * 1000,
+
     max: 50,
 
-    standardHeaders: true,
-    legacyHeaders: false,
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false,
 
     message: {
       error:
         "Too many application submissions. Please try again later."
+    }
+  });
+
+
+const publicAccessLimiter =
+  rateLimit({
+    windowMs:
+      15 * 60 * 1000,
+
+    max: 30,
+
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false,
+
+    message: {
+      error:
+        "Too many authorization requests."
     }
   });
 
@@ -230,40 +357,39 @@ const applicationLimiter =
 const storage =
   multer.diskStorage({
 
-    destination: (req, file, cb) => {
-
-      const field =
-        file.fieldname;
+    destination: (
+      req,
+      file,
+      cb
+    ) => {
 
       if (
-        field === "photo" ||
-        field === "photoFile"
+        file.fieldname === "photo" ||
+        file.fieldname === "photoFile"
       ) {
 
-        cb(
+        return cb(
           null,
           PHOTOS_DIR
         );
 
-        return;
       }
 
 
       if (
-        field === "resume" ||
-        field === "resumeFile"
+        file.fieldname === "resume" ||
+        file.fieldname === "resumeFile"
       ) {
 
-        cb(
+        return cb(
           null,
           RESUMES_DIR
         );
 
-        return;
       }
 
 
-      cb(
+      return cb(
         null,
         DOCUMENTS_DIR
       );
@@ -271,7 +397,11 @@ const storage =
     },
 
 
-    filename: (req, file, cb) => {
+    filename: (
+      req,
+      file,
+      cb
+    ) => {
 
       const extension =
         path.extname(
@@ -279,7 +409,8 @@ const storage =
         ).toLowerCase();
 
       const randomName =
-        crypto.randomBytes(18)
+        crypto
+          .randomBytes(18)
           .toString("hex");
 
       cb(
@@ -292,6 +423,20 @@ const storage =
   });
 
 
+const allowedMimeTypes =
+  new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+
+    "application/pdf",
+
+    "application/msword",
+
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ]);
+
+
 const upload =
   multer({
 
@@ -299,16 +444,13 @@ const upload =
 
     limits: {
 
-      /*
-       * Maximum individual file size:
-       * 10 MB
-       */
       fileSize:
         10 * 1024 * 1024,
 
-      files: 20
-    },
+      files:
+        20
 
+    },
 
     fileFilter: (
       req,
@@ -316,177 +458,62 @@ const upload =
       cb
     ) => {
 
-      const allowed =
-        [
-          "image/jpeg",
-          "image/png",
-          "image/webp",
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ];
-
-
       if (
-        allowed.includes(
+        allowedMimeTypes.has(
           file.mimetype
         )
       ) {
 
-        cb(
+        return cb(
           null,
           true
         );
 
-      } else {
-
-        cb(
-          new Error(
-            "Unsupported file type."
-          )
-        );
-
       }
+
+      return cb(
+        new Error(
+          "Unsupported file type."
+        )
+      );
 
     }
 
   });
 
 
-/*
- * Application upload fields.
- */
 const applicationUpload =
   upload.fields([
     {
       name: "photo",
       maxCount: 1
     },
+
     {
       name: "photoFile",
       maxCount: 1
     },
+
     {
       name: "resume",
       maxCount: 1
     },
+
     {
       name: "resumeFile",
       maxCount: 1
     },
+
     {
       name: "documents",
       maxCount: 15
     },
+
     {
       name: "files",
       maxCount: 15
     }
   ]);
-
-
-/* =========================================================
-   DATABASE INITIALIZATION
-========================================================= */
-
-async function initializeDatabase() {
-
-  if (!pool) {
-
-    console.warn(
-      "Database initialization skipped because DATABASE_URL is missing."
-    );
-
-    return;
-  }
-
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS applications (
-      id UUID PRIMARY KEY,
-      application_id VARCHAR(50) UNIQUE NOT NULL,
-
-      applicant_data JSONB NOT NULL DEFAULT '{}'::jsonb,
-
-      status VARCHAR(50)
-        NOT NULL DEFAULT 'Submitted',
-
-      created_at TIMESTAMPTZ
-        NOT NULL DEFAULT NOW(),
-
-      updated_at TIMESTAMPTZ
-        NOT NULL DEFAULT NOW()
-    );
-  `);
-
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS application_files (
-      id UUID PRIMARY KEY,
-
-      application_id UUID NOT NULL
-        REFERENCES applications(id)
-        ON DELETE CASCADE,
-
-      original_name TEXT NOT NULL,
-      stored_name TEXT NOT NULL,
-      relative_path TEXT NOT NULL,
-      mime_type VARCHAR(150),
-      category VARCHAR(50),
-      file_size BIGINT,
-
-      created_at TIMESTAMPTZ
-        NOT NULL DEFAULT NOW()
-    );
-  `);
-
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS access_requests (
-      id UUID PRIMARY KEY,
-
-      application_id UUID NOT NULL
-        REFERENCES applications(id)
-        ON DELETE CASCADE,
-
-      type VARCHAR(50)
-        NOT NULL DEFAULT 'wrt',
-
-      status VARCHAR(50)
-        NOT NULL DEFAULT 'pending',
-
-      requested_at TIMESTAMPTZ
-        NOT NULL DEFAULT NOW(),
-
-      approved_at TIMESTAMPTZ,
-
-      expires_at TIMESTAMPTZ
-    );
-  `);
-
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS audit_logs (
-      id UUID PRIMARY KEY,
-
-      action VARCHAR(100) NOT NULL,
-
-      application_id UUID,
-
-      metadata JSONB
-        NOT NULL DEFAULT '{}'::jsonb,
-
-      created_at TIMESTAMPTZ
-        NOT NULL DEFAULT NOW()
-    );
-  `);
-
-
-  console.log(
-    "PostgreSQL database initialized."
-  );
-
-}
 
 
 /* =========================================================
@@ -501,7 +528,8 @@ function generateApplicationId() {
       .toUpperCase();
 
   const random =
-    crypto.randomBytes(4)
+    crypto
+      .randomBytes(5)
       .toString("hex")
       .toUpperCase();
 
@@ -522,13 +550,23 @@ function safeJsonParse(value) {
 
   try {
 
-    return JSON.parse(value);
+    const parsed =
+      JSON.parse(value);
+
+    if (
+      parsed &&
+      typeof parsed === "object"
+    ) {
+
+      return parsed;
+
+    }
+
+    return {};
 
   } catch {
 
-    return {
-      value
-    };
+    return {};
 
   }
 
@@ -541,9 +579,10 @@ function getUploadedFiles(files) {
     return [];
   }
 
-  return Object.values(files)
+  return Object
+    .values(files)
     .flat()
-    .map(file => {
+    .map((file) => {
 
       let category =
         "document";
@@ -557,7 +596,10 @@ function getUploadedFiles(files) {
         category =
           "photo";
 
-      } else if (
+      }
+
+
+      if (
         file.fieldname === "resume" ||
         file.fieldname === "resumeFile"
       ) {
@@ -578,21 +620,111 @@ function getUploadedFiles(files) {
 }
 
 
+function cleanupUploadedFiles(files) {
+
+  if (!files) {
+    return;
+  }
+
+  for (
+    const item
+    of Object.values(files).flat()
+  ) {
+
+    try {
+
+      if (
+        item &&
+        item.path &&
+        fs.existsSync(item.path)
+      ) {
+
+        fs.unlinkSync(
+          item.path
+        );
+
+      }
+
+    } catch(error) {
+
+      console.error(
+        "File cleanup error:",
+        error.message
+      );
+
+    }
+
+  }
+
+}
+
+
+function sanitizeFilename(filename) {
+
+  return String(filename || "file")
+    .replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    );
+
+}
+
+
+function isInsideDirectory(
+  filePath,
+  directory
+) {
+
+  const resolvedFile =
+    path.resolve(
+      filePath
+    );
+
+  const resolvedDirectory =
+    path.resolve(
+      directory
+    );
+
+  const relative =
+    path.relative(
+      resolvedDirectory,
+      resolvedFile
+    );
+
+  return (
+    relative &&
+    !relative.startsWith("..") &&
+    !path.isAbsolute(relative)
+  );
+
+}
+
+
 /* =========================================================
    AUTHENTICATION
 ========================================================= */
 
 function createAdminSession() {
 
+  if (!SESSION_SECRET) {
+
+    throw new Error(
+      "SESSION_SECRET is not configured."
+    );
+
+  }
+
   return jwt.sign(
     {
-      role: "admin"
+      role:
+        "admin"
     },
 
     SESSION_SECRET,
 
     {
-      expiresIn: "8h"
+      expiresIn:
+        "8h"
     }
   );
 
@@ -631,6 +763,15 @@ function requireAdmin(
 
   try {
 
+    if (!SESSION_SECRET) {
+
+      throw new Error(
+        "SESSION_SECRET missing."
+      );
+
+    }
+
+
     const decoded =
       jwt.verify(
         token,
@@ -639,7 +780,8 @@ function requireAdmin(
 
 
     if (
-      decoded.role !== "admin"
+      decoded.role !==
+      "admin"
     ) {
 
       return res
@@ -656,9 +798,9 @@ function requireAdmin(
       decoded;
 
 
-    next();
+    return next();
 
-  } catch {
+  } catch(error) {
 
     return res
       .status(401)
@@ -673,7 +815,7 @@ function requireAdmin(
 
 
 /* =========================================================
-   AUDIT LOGGING
+   AUDIT LOG
 ========================================================= */
 
 async function writeAuditLog(
@@ -704,7 +846,9 @@ async function writeAuditLog(
         crypto.randomUUID(),
         action,
         applicationId,
-        metadata
+        JSON.stringify(
+          metadata || {}
+        )
       ]
     );
 
@@ -721,7 +865,153 @@ async function writeAuditLog(
 
 
 /* =========================================================
-   HEALTH
+   DATABASE INITIALIZATION
+========================================================= */
+
+async function initializeDatabase() {
+
+  if (!pool) {
+
+    console.warn(
+      "Database initialization skipped."
+    );
+
+    return;
+
+  }
+
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS applications (
+      id UUID PRIMARY KEY,
+
+      application_id VARCHAR(60)
+        UNIQUE NOT NULL,
+
+      applicant_data JSONB
+        NOT NULL DEFAULT '{}'::jsonb,
+
+      status VARCHAR(50)
+        NOT NULL DEFAULT 'Submitted',
+
+      created_at TIMESTAMPTZ
+        NOT NULL DEFAULT NOW(),
+
+      updated_at TIMESTAMPTZ
+        NOT NULL DEFAULT NOW()
+    );
+  `);
+
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS application_files (
+      id UUID PRIMARY KEY,
+
+      application_id UUID NOT NULL
+        REFERENCES applications(id)
+        ON DELETE CASCADE,
+
+      original_name TEXT NOT NULL,
+
+      stored_name TEXT NOT NULL,
+
+      relative_path TEXT NOT NULL,
+
+      mime_type VARCHAR(150),
+
+      category VARCHAR(50),
+
+      file_size BIGINT,
+
+      created_at TIMESTAMPTZ
+        NOT NULL DEFAULT NOW()
+    );
+  `);
+
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS access_requests (
+      id UUID PRIMARY KEY,
+
+      application_id UUID NOT NULL
+        REFERENCES applications(id)
+        ON DELETE CASCADE,
+
+      type VARCHAR(50)
+        NOT NULL DEFAULT 'wrt',
+
+      status VARCHAR(50)
+        NOT NULL DEFAULT 'pending',
+
+      requested_at TIMESTAMPTZ
+        NOT NULL DEFAULT NOW(),
+
+      approved_at TIMESTAMPTZ,
+
+      expires_at TIMESTAMPTZ
+    );
+  `);
+
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id UUID PRIMARY KEY,
+
+      action VARCHAR(100)
+        NOT NULL,
+
+      application_id UUID,
+
+      metadata JSONB
+        NOT NULL DEFAULT '{}'::jsonb,
+
+      created_at TIMESTAMPTZ
+        NOT NULL DEFAULT NOW()
+    );
+  `);
+
+
+  /*
+   * Useful indexes.
+   */
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS
+    idx_applications_created_at
+    ON applications(created_at DESC);
+  `);
+
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS
+    idx_application_files_application
+    ON application_files(application_id);
+  `);
+
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS
+    idx_access_requests_application
+    ON access_requests(application_id);
+  `);
+
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS
+    idx_audit_logs_created_at
+    ON audit_logs(created_at DESC);
+  `);
+
+
+  console.log(
+    "PostgreSQL database initialized."
+  );
+
+}
+
+
+/* =========================================================
+   HEALTH CHECK
 ========================================================= */
 
 app.get(
@@ -743,7 +1033,7 @@ app.get(
         database =
           "connected";
 
-      } catch {
+      } catch(error) {
 
         database =
           "error";
@@ -753,7 +1043,10 @@ app.get(
     }
 
 
-    res.json({
+    return res.json({
+
+      success:
+        true,
 
       status:
         "ok",
@@ -765,6 +1058,9 @@ app.get(
 
       environment:
         NODE_ENV,
+
+      ai:
+        Boolean(AI_API_KEY),
 
       timestamp:
         new Date().toISOString()
@@ -793,20 +1089,20 @@ app.post(
           .status(500)
           .json({
             error:
-              "ADMIN_TOKEN is not configured on the server."
+              "ADMIN_TOKEN is not configured."
           });
 
       }
 
 
-      const token =
+      const suppliedToken =
         typeof req.body?.token ===
         "string"
           ? req.body.token.trim()
           : "";
 
 
-      if (!token) {
+      if (!suppliedToken) {
 
         return res
           .status(400)
@@ -820,7 +1116,7 @@ app.post(
 
       const supplied =
         Buffer.from(
-          token
+          suppliedToken
         );
 
       const expected =
@@ -910,7 +1206,7 @@ app.post(
       "admin_logout"
     );
 
-    res.json({
+    return res.json({
       success:
         true
     });
@@ -930,25 +1226,27 @@ app.post(
 
   async (req, res) => {
 
+    if (!pool) {
+
+      cleanupUploadedFiles(
+        req.files
+      );
+
+      return res
+        .status(503)
+        .json({
+          error:
+            "Database is not configured."
+        });
+
+    }
+
+
     const client =
-      pool
-        ? await pool.connect()
-        : null;
+      await pool.connect();
 
 
     try {
-
-      if (!pool) {
-
-        return res
-          .status(503)
-          .json({
-            error:
-              "Database is not configured."
-          });
-
-      }
-
 
       const applicantData =
         safeJsonParse(
@@ -958,30 +1256,27 @@ app.post(
         );
 
 
-      /*
-       * Also preserve ordinary form fields.
-       */
-      const ordinaryFields =
-        {
-          ...req.body
-        };
+      const ordinaryFields = {
+        ...req.body
+      };
 
 
       delete ordinaryFields.data;
       delete ordinaryFields.applicationData;
 
 
-      const combinedData =
-        {
-          ...ordinaryFields,
-          ...(
-            typeof applicantData ===
-              "object" &&
-            applicantData !== null
-              ? applicantData
-              : {}
-          )
-        };
+      const combinedData = {
+
+        ...ordinaryFields,
+
+        ...(
+          applicantData &&
+          typeof applicantData === "object"
+            ? applicantData
+            : {}
+        )
+
+      };
 
 
       const applicationUUID =
@@ -1007,12 +1302,19 @@ app.post(
           status
         )
         VALUES
-        ($1, $2, $3, 'Submitted')
+        (
+          $1,
+          $2,
+          $3,
+          'Submitted'
+        )
         `,
         [
           applicationUUID,
           applicationId,
-          combinedData
+          JSON.stringify(
+            combinedData
+          )
         ]
       );
 
@@ -1027,7 +1329,8 @@ app.post(
 
 
       for (
-        const item of uploaded
+        const item
+        of uploaded
       ) {
 
         const file =
@@ -1144,17 +1447,17 @@ app.post(
 
     } catch(error) {
 
-      if (client) {
+      try {
 
-        try {
+        await client.query(
+          "ROLLBACK"
+        );
 
-          await client.query(
-            "ROLLBACK"
-          );
+      } catch {}
 
-        } catch {}
-
-      }
+      cleanupUploadedFiles(
+        req.files
+      );
 
 
       console.error(
@@ -1172,9 +1475,7 @@ app.post(
 
     } finally {
 
-      if (client) {
-        client.release();
-      }
+      client.release();
 
     }
 
@@ -1194,6 +1495,18 @@ app.get(
 
     try {
 
+      if (!pool) {
+
+        return res
+          .status(503)
+          .json({
+            error:
+              "Database is not configured."
+          });
+
+      }
+
+
       const result =
         await pool.query(
           `
@@ -1210,15 +1523,14 @@ app.get(
         );
 
 
-      const applications =
-        result.rows;
-
-
       return res.json({
+
         success:
           true,
 
-        applications
+        applications:
+          result.rows
+
       });
 
     } catch(error) {
@@ -1242,7 +1554,7 @@ app.get(
 
 
 /* =========================================================
-   ADMIN — GET ONE APPLICATION
+   ADMIN — GET APPLICATION
 ========================================================= */
 
 app.get(
@@ -1253,11 +1565,7 @@ app.get(
 
     try {
 
-      const identifier =
-        req.params.id;
-
-
-      const application =
+      const result =
         await pool.query(
           `
           SELECT
@@ -1274,13 +1582,13 @@ app.get(
           LIMIT 1
           `,
           [
-            identifier
+            req.params.id
           ]
         );
 
 
       if (
-        application.rows.length === 0
+        result.rows.length === 0
       ) {
 
         return res
@@ -1293,8 +1601,8 @@ app.get(
       }
 
 
-      const row =
-        application.rows[0];
+      const application =
+        result.rows[0];
 
 
       const files =
@@ -1312,17 +1620,17 @@ app.get(
           ORDER BY created_at ASC
           `,
           [
-            row.id
+            application.id
           ]
         );
 
 
       await writeAuditLog(
         "application_viewed",
-        row.id,
+        application.id,
         {
           applicationId:
-            row.application_id
+            application.application_id
         }
       );
 
@@ -1332,8 +1640,7 @@ app.get(
         success:
           true,
 
-        application:
-          row,
+        application,
 
         files:
           files.rows
@@ -1361,7 +1668,7 @@ app.get(
 
 
 /* =========================================================
-   ADMIN — UPDATE STATUS
+   ADMIN — UPDATE APPLICATION STATUS
 ========================================================= */
 
 app.patch(
@@ -1372,16 +1679,15 @@ app.patch(
 
     try {
 
-      const allowedStatuses =
-        [
-          "Submitted",
-          "Under Review",
-          "Documents Required",
-          "Verified",
-          "Approved",
-          "Rejected",
-          "Withdrawn"
-        ];
+      const allowedStatuses = [
+        "Submitted",
+        "Under Review",
+        "Documents Required",
+        "Verified",
+        "Approved",
+        "Rejected",
+        "Withdrawn"
+      ];
 
 
       const status =
@@ -1443,13 +1749,13 @@ app.patch(
       }
 
 
-      const row =
+      const application =
         result.rows[0];
 
 
       await writeAuditLog(
         "application_status_changed",
-        row.id,
+        application.id,
         {
           status
         }
@@ -1461,8 +1767,7 @@ app.patch(
         success:
           true,
 
-        application:
-          row
+        application
 
       });
 
@@ -1553,7 +1858,7 @@ app.get(
 
 
 /* =========================================================
-   ADMIN — VIEW/DOWNLOAD FILE
+   ADMIN — VIEW FILE
 ========================================================= */
 
 app.get(
@@ -1608,18 +1913,10 @@ app.get(
         );
 
 
-      /*
-       * Path safety check.
-       */
-      const uploadsRoot =
-        path.resolve(
-          UPLOADS_DIR
-        );
-
-
       if (
-        !absolutePath.startsWith(
-          uploadsRoot + path.sep
+        !isInsideDirectory(
+          absolutePath,
+          UPLOADS_DIR
         )
       ) {
 
@@ -1658,7 +1955,9 @@ app.get(
 
       res.setHeader(
         "Content-Disposition",
-        `inline; filename="${encodeURIComponent(file.original_name)}"`
+        `inline; filename="${sanitizeFilename(
+          file.original_name
+        )}"`
       );
 
 
@@ -1697,7 +1996,7 @@ app.get(
 
 
 /* =========================================================
-   ADMIN — GENERATE APPLICATION PDF
+   ADMIN — GENERATE PDF
 ========================================================= */
 
 app.get(
@@ -1781,7 +2080,9 @@ app.get(
 
       res.setHeader(
         "Content-Disposition",
-        `inline; filename="${application.application_id}.pdf"`
+        `inline; filename="${sanitizeFilename(
+          application.application_id
+        )}.pdf"`
       );
 
 
@@ -1847,30 +2148,18 @@ app.get(
         )
       ) {
 
-        let printable;
+        let printable = "";
 
 
         if (
-          value === null ||
-          value === undefined
+          value !== null &&
+          value !== undefined
         ) {
 
           printable =
-            "";
-
-        } else if (
-          typeof value === "object"
-        ) {
-
-          printable =
-            JSON.stringify(
-              value
-            );
-
-        } else {
-
-          printable =
-            String(value);
+            typeof value === "object"
+              ? JSON.stringify(value)
+              : String(value);
 
         }
 
@@ -1908,15 +2197,16 @@ app.get(
 
       } else {
 
-        files.rows.forEach(
-          file => {
+        for (
+          const file
+          of files.rows
+        ) {
 
-            doc.text(
-              `${file.category}: ${file.original_name}`
-            );
+          doc.text(
+            `${file.category}: ${file.original_name}`
+          );
 
-          }
-        );
+        }
 
       }
 
@@ -1972,7 +2262,7 @@ app.get(
 
 
 /* =========================================================
-   WRT — REQUEST EXPLICIT AUTHORIZATION
+   WRT — CREATE ACCESS REQUEST
 ========================================================= */
 
 app.post(
@@ -1985,14 +2275,17 @@ app.post(
 
       const type =
         String(
-          req.body?.type || "wrt"
+          req.body?.type ||
+          "wrt"
         ).trim();
 
 
       const application =
         await pool.query(
           `
-          SELECT id, application_id
+          SELECT
+            id,
+            application_id
           FROM applications
           WHERE
             id::text = $1
@@ -2026,6 +2319,7 @@ app.post(
       /*
        * Expire old pending requests.
        */
+
       await pool.query(
         `
         UPDATE access_requests
@@ -2067,6 +2361,7 @@ app.post(
           )
           RETURNING
             id,
+            application_id,
             type,
             status,
             requested_at,
@@ -2100,7 +2395,7 @@ app.post(
             result.rows[0],
 
           message:
-            "Authorization request created. User approval is still required."
+            "Authorization request created."
 
         });
 
@@ -2125,7 +2420,339 @@ app.post(
 
 
 /* =========================================================
-   WRT — ACCESS STATUS
+   WRT — PUBLIC AUTHORIZATION INFORMATION
+========================================================= */
+
+app.get(
+  "/api/access/:requestId",
+  publicAccessLimiter,
+
+  async (req, res) => {
+
+    try {
+
+      const result =
+        await pool.query(
+          `
+          SELECT
+            ar.id,
+            ar.type,
+            ar.status,
+            ar.requested_at,
+            ar.expires_at,
+            a.application_id
+          FROM access_requests ar
+          INNER JOIN applications a
+            ON a.id = ar.application_id
+          WHERE ar.id = $1
+          LIMIT 1
+          `,
+          [
+            req.params.requestId
+          ]
+        );
+
+
+      if (
+        result.rows.length === 0
+      ) {
+
+        return res
+          .status(404)
+          .json({
+            error:
+              "Authorization request not found."
+          });
+
+      }
+
+
+      const request =
+        result.rows[0];
+
+
+      if (
+        request.expires_at &&
+        new Date(
+          request.expires_at
+        ) < new Date() &&
+        request.status === "pending"
+      ) {
+
+        await pool.query(
+          `
+          UPDATE access_requests
+          SET status = 'expired'
+          WHERE id = $1
+          `,
+          [
+            request.id
+          ]
+        );
+
+
+        request.status =
+          "expired";
+
+      }
+
+
+      return res.json({
+
+        success:
+          true,
+
+        request: {
+
+          id:
+            request.id,
+
+          type:
+            request.type,
+
+          status:
+            request.status,
+
+          applicationId:
+            request.application_id,
+
+          requestedAt:
+            request.requested_at,
+
+          expiresAt:
+            request.expires_at
+
+        }
+
+      });
+
+    } catch(error) {
+
+      console.error(
+        "Public access lookup error:",
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Unable to retrieve authorization request."
+        });
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   WRT — PUBLIC APPROVAL
+========================================================= */
+
+app.post(
+  "/api/access/:requestId/approve",
+  publicAccessLimiter,
+
+  async (req, res) => {
+
+    try {
+
+      const result =
+        await pool.query(
+          `
+          UPDATE access_requests
+          SET
+            status = 'approved',
+            approved_at = NOW(),
+            expires_at =
+              LEAST(
+                COALESCE(
+                  expires_at,
+                  NOW() + INTERVAL '30 minutes'
+                ),
+                NOW() + INTERVAL '30 minutes'
+              )
+          WHERE
+            id = $1
+            AND status = 'pending'
+            AND (
+              expires_at IS NULL
+              OR expires_at > NOW()
+            )
+          RETURNING
+            id,
+            application_id,
+            type,
+            status,
+            approved_at,
+            expires_at
+          `,
+          [
+            req.params.requestId
+          ]
+        );
+
+
+      if (
+        result.rows.length === 0
+      ) {
+
+        return res
+          .status(400)
+          .json({
+            error:
+              "Request is invalid, expired, or already processed."
+          });
+
+      }
+
+
+      const request =
+        result.rows[0];
+
+
+      await writeAuditLog(
+        "wrt_user_approved",
+        request.application_id,
+        {
+          requestId:
+            request.id
+        }
+      );
+
+
+      return res.json({
+
+        success:
+          true,
+
+        authorized:
+          true,
+
+        request
+
+      });
+
+    } catch(error) {
+
+      console.error(
+        "Public approval error:",
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Unable to approve authorization."
+        });
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   WRT — PUBLIC DENIAL
+========================================================= */
+
+app.post(
+  "/api/access/:requestId/deny",
+  publicAccessLimiter,
+
+  async (req, res) => {
+
+    try {
+
+      const result =
+        await pool.query(
+          `
+          UPDATE access_requests
+          SET
+            status = 'denied'
+          WHERE
+            id = $1
+            AND status = 'pending'
+            AND (
+              expires_at IS NULL
+              OR expires_at > NOW()
+            )
+          RETURNING
+            id,
+            application_id,
+            type,
+            status
+          `,
+          [
+            req.params.requestId
+          ]
+        );
+
+
+      if (
+        result.rows.length === 0
+      ) {
+
+        return res
+          .status(400)
+          .json({
+            error:
+              "Request is invalid, expired, or already processed."
+          });
+
+      }
+
+
+      const request =
+        result.rows[0];
+
+
+      await writeAuditLog(
+        "wrt_user_denied",
+        request.application_id,
+        {
+          requestId:
+            request.id
+        }
+      );
+
+
+      return res.json({
+
+        success:
+          true,
+
+        authorized:
+          false,
+
+        request
+
+      });
+
+    } catch(error) {
+
+      console.error(
+        "Public denial error:",
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Unable to deny authorization."
+        });
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   WRT — ADMIN ACCESS STATUS
 ========================================================= */
 
 app.get(
@@ -2196,15 +2823,34 @@ app.get(
 
       const active =
         requests.find(
-          request =>
-            request.status ===
-              "approved" &&
-            (
-              !request.expires_at ||
+          (request) => {
+
+            if (
+              request.status !==
+              "approved"
+            ) {
+
+              return false;
+
+            }
+
+
+            if (
+              !request.expires_at
+            ) {
+
+              return true;
+
+            }
+
+
+            return (
               new Date(
                 request.expires_at
               ) > new Date()
-            )
+            );
+
+          }
         );
 
 
@@ -2244,7 +2890,8 @@ app.get(
 
 
 /* =========================================================
-   WRT — APPROVE AUTHORIZATION
+   ADMIN — APPROVE ACCESS
+   Kept for administrative workflows.
 ========================================================= */
 
 app.patch(
@@ -2263,12 +2910,16 @@ app.patch(
             status = 'approved',
             approved_at = NOW(),
             expires_at =
-              COALESCE(
-                expires_at,
+              LEAST(
+                COALESCE(
+                  expires_at,
+                  NOW() + INTERVAL '30 minutes'
+                ),
                 NOW() + INTERVAL '30 minutes'
               )
           WHERE
             id = $1
+            AND status = 'pending'
           RETURNING *
           `,
           [
@@ -2285,7 +2936,7 @@ app.patch(
           .status(404)
           .json({
             error:
-              "Authorization request not found."
+              "Authorization request not found or already processed."
           });
 
       }
@@ -2296,7 +2947,7 @@ app.patch(
 
 
       await writeAuditLog(
-        "wrt_authorization_approved",
+        "wrt_admin_approved",
         request.application_id,
         {
           requestId:
@@ -2317,7 +2968,7 @@ app.patch(
     } catch(error) {
 
       console.error(
-        "Authorization approval error:",
+        "Admin authorization approval error:",
         error
       );
 
@@ -2335,7 +2986,7 @@ app.patch(
 
 
 /* =========================================================
-   WRT — DENY AUTHORIZATION
+   ADMIN — DENY ACCESS
 ========================================================= */
 
 app.patch(
@@ -2354,6 +3005,7 @@ app.patch(
             status = 'denied'
           WHERE
             id = $1
+            AND status = 'pending'
           RETURNING *
           `,
           [
@@ -2370,7 +3022,7 @@ app.patch(
           .status(404)
           .json({
             error:
-              "Authorization request not found."
+              "Authorization request not found or already processed."
           });
 
       }
@@ -2381,7 +3033,7 @@ app.patch(
 
 
       await writeAuditLog(
-        "wrt_authorization_denied",
+        "wrt_admin_denied",
         request.application_id,
         {
           requestId:
@@ -2402,7 +3054,7 @@ app.patch(
     } catch(error) {
 
       console.error(
-        "Authorization denial error:",
+        "Admin authorization denial error:",
         error
       );
 
@@ -2478,17 +3130,8 @@ app.get(
 
 
 /* =========================================================
-   OPTIONAL AI ENDPOINT
+   AI — ADMIN ANALYSIS
 ========================================================= */
-
-/*
- * AI is intentionally server-side.
- *
- * The frontend must never receive AI_API_KEY.
- *
- * This endpoint is a placeholder integration point.
- * We will connect the actual AI provider later.
- */
 
 app.post(
   "/api/admin/ai/analyze",
@@ -2498,42 +3141,155 @@ app.post(
 
     try {
 
-      if (
-        !process.env.AI_API_KEY
-      ) {
+      if (!AI_API_KEY) {
 
         return res
           .status(503)
           .json({
             error:
-              "AI integration is not configured."
+              "AI_API_KEY is not configured."
           });
 
       }
 
 
-      /*
-       * Actual provider integration can be
-       * connected here later.
-       */
+      const input =
+        req.body?.input;
+
+
+      if (
+        !input ||
+        typeof input !== "string"
+      ) {
+
+        return res
+          .status(400)
+          .json({
+            error:
+              "AI input is required."
+          });
+
+      }
+
+
+      const response =
+        await fetch(
+          AI_API_URL,
+          {
+            method:
+              "POST",
+
+            headers: {
+
+              "Content-Type":
+                "application/json",
+
+              "Authorization":
+                `Bearer ${AI_API_KEY}`
+
+            },
+
+            body:
+              JSON.stringify({
+
+                model:
+                  AI_MODEL,
+
+                messages: [
+
+                  {
+                    role:
+                      "system",
+
+                    content:
+                      "You are an administrative application-analysis assistant. Analyze supplied application information factually and clearly. Do not invent missing information."
+                  },
+
+                  {
+                    role:
+                      "user",
+
+                    content:
+                      input
+                  }
+
+                ],
+
+                temperature:
+                  0.2
+
+              })
+
+          }
+        );
+
+
+      const data =
+        await response.json();
+
+
+      if (!response.ok) {
+
+        console.error(
+          "AI provider error:",
+          data
+        );
+
+        return res
+          .status(502)
+          .json({
+            error:
+              "AI provider request failed."
+          });
+
+      }
+
+
+      const answer =
+        data?.choices?.[0]?.message?.content ||
+        data?.output?.[0]?.content?.[0]?.text ||
+        "";
+
+
+      if (!answer) {
+
+        return res
+          .status(502)
+          .json({
+            error:
+              "AI provider returned no usable response."
+          });
+
+      }
+
+
+      await writeAuditLog(
+        "ai_analysis_requested",
+        null,
+        {
+          model:
+            AI_MODEL
+        }
+      );
+
 
       return res.json({
 
         success:
           true,
 
-        configured:
-          true,
+        model:
+          AI_MODEL,
 
-        message:
-          "AI integration point is ready."
+        analysis:
+          answer
 
       });
 
     } catch(error) {
 
       console.error(
-        "AI endpoint error:",
+        "AI analysis error:",
         error
       );
 
@@ -2541,7 +3297,7 @@ app.post(
         .status(500)
         .json({
           error:
-            "AI request failed."
+            "AI analysis failed."
         });
 
     }
@@ -2551,7 +3307,7 @@ app.post(
 
 
 /* =========================================================
-   SERVE FRONTEND
+   STATIC FRONTEND
 ========================================================= */
 
 app.use(
@@ -2561,14 +3317,15 @@ app.use(
 );
 
 
-/*
- * Explicit root route.
- */
+/* =========================================================
+   ROOT
+========================================================= */
+
 app.get(
   "/",
   (req, res) => {
 
-    res.sendFile(
+    return res.sendFile(
       path.join(
         PUBLIC_DIR,
         "index.html"
@@ -2580,14 +3337,14 @@ app.get(
 
 
 /* =========================================================
-   404 API HANDLER
+   API 404
 ========================================================= */
 
 app.use(
   "/api",
   (req, res) => {
 
-    res
+    return res
       .status(404)
       .json({
         error:
@@ -2599,11 +3356,16 @@ app.use(
 
 
 /* =========================================================
-   MULTER / GENERAL ERROR HANDLER
+   ERROR HANDLER
 ========================================================= */
 
 app.use(
-  (error, req, res, next) => {
+  (
+    error,
+    req,
+    res,
+    next
+  ) => {
 
     console.error(
       "Server error:",
@@ -2631,6 +3393,21 @@ app.use(
       }
 
 
+      if (
+        error.code ===
+        "LIMIT_FILE_COUNT"
+      ) {
+
+        return res
+          .status(400)
+          .json({
+            error:
+              "Too many files uploaded."
+          });
+
+      }
+
+
       return res
         .status(400)
         .json({
@@ -2650,7 +3427,22 @@ app.use(
         .status(400)
         .json({
           error:
-            error.message
+            "Unsupported file type."
+        });
+
+    }
+
+
+    if (
+      error?.message ===
+      "Origin not allowed by CORS."
+    ) {
+
+      return res
+        .status(403)
+        .json({
+          error:
+            "Origin not allowed."
         });
 
     }
@@ -2697,6 +3489,12 @@ async function startServer() {
 
         console.log(
           `Environment: ${NODE_ENV}`
+        );
+
+        console.log(
+          `AI configured: ${Boolean(
+            AI_API_KEY
+          )}`
         );
 
         console.log(
