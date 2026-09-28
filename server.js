@@ -94,8 +94,8 @@ if (!SESSION_SECRET) {
    DIRECTORIES
 ========================================================= */
 
-const PUBLIC_DIR =
-  path.join(__dirname, "public");
+const index.html_DIR =
+  path.join(__dirname, "index.html");
 
 const DATA_DIR =
   path.join(__dirname, "data");
@@ -330,7 +330,7 @@ const applicationLimiter =
   });
 
 
-const publicAccessLimiter =
+const index.htmlAccessLimiter =
   rateLimit({
     windowMs:
       15 * 60 * 1000,
@@ -2420,12 +2420,12 @@ app.post(
 
 
 /* =========================================================
-   WRT — PUBLIC AUTHORIZATION INFORMATION
+   WRT — index.html AUTHORIZATION INFORMATION
 ========================================================= */
 
 app.get(
   "/api/access/:requestId",
-  publicAccessLimiter,
+  index.htmlAccessLimiter,
 
   async (req, res) => {
 
@@ -2529,7 +2529,7 @@ app.get(
     } catch(error) {
 
       console.error(
-        "Public access lookup error:",
+        "index.html access lookup error:",
         error
       );
 
@@ -2547,12 +2547,12 @@ app.get(
 
 
 /* =========================================================
-   WRT — PUBLIC APPROVAL
+   WRT — Index.html APPROVAL
 ========================================================= */
 
 app.post(
   "/api/access/:requestId/approve",
-  publicAccessLimiter,
+  index.htmlAccessLimiter,
 
   async (req, res) => {
 
@@ -2637,7 +2637,7 @@ app.post(
     } catch(error) {
 
       console.error(
-        "Public approval error:",
+        "index.html approval error:",
         error
       );
 
@@ -2655,12 +2655,12 @@ app.post(
 
 
 /* =========================================================
-   WRT — PUBLIC DENIAL
+   WRT — index.html DENIAL
 ========================================================= */
 
 app.post(
   "/api/access/:requestId/deny",
-  publicAccessLimiter,
+  index.htmlAccessLimiter,
 
   async (req, res) => {
 
@@ -2734,7 +2734,7 @@ app.post(
     } catch(error) {
 
       console.error(
-        "Public denial error:",
+        "index.html denial error:",
         error
       );
 
@@ -3312,7 +3312,7 @@ app.post(
 
 app.use(
   express.static(
-    PUBLIC_DIR
+    index.html_DIR
   )
 );
 
@@ -3327,7 +3327,7 @@ app.get(
 
     return res.sendFile(
       path.join(
-        PUBLIC_DIR,
+        INDEX.HTML_DIR,
         "index.html"
       )
     );
