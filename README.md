@@ -1,16 +1,14 @@
-APPLICATION FORM MANAGEMENT SYSTEM
+# Application Form Management System
 
 A secure, modular web-based application form management system built with Node.js, Express and PostgreSQL.
 
-
-OVERVIEW
+## Overview
 
 The Application Form Management System provides a structured platform for collecting, storing, reviewing and managing application data and supporting documents.
 
 The project is designed with separate public and administrative interfaces, controlled file uploads, administrator authentication, authorization workflows, audit logging and configurable frontend data.
 
-
-FEATURES
+## Features
 
 - Public application form
 - Administrative dashboard
@@ -32,8 +30,7 @@ FEATURES
 - Environment-based configuration
 - AI integration point for authorized administrative analysis
 
-
-TECHNOLOGY STACK
+## Technology Stack
 
 - Node.js
 - Express.js
@@ -47,9 +44,9 @@ TECHNOLOGY STACK
 - CSS3
 - JavaScript
 
+## Project Structure
 
-PROJECT STRUCTURE
-
+```text
 application-forms/
 │
 ├── server.js
@@ -97,7 +94,6 @@ application-forms/
 │   └── resumes/
 │
 └── ...
-
 
 REQUIREMENTS
 
