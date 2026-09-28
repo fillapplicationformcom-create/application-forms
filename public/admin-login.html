@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="robots"
+    content="noindex,nofollow"
+  >
+
+  <title>Administrator Login</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Arial,
+        sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(
+          circle at 15% 20%,
+          rgba(170, 120, 90, 0.16),
+          transparent 32%
+        ),
+        radial-gradient(
+          circle at 85% 80%,
+          rgba(110, 130, 160, 0.16),
+          transparent 32%
+        ),
+        linear-gradient(
+          135deg,
+          #f1e7df,
+          #e8e4dc,
+          #e3e9e5,
+          #ebe4ee
+        );
+    }
+
+    .login-wrapper {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .login-card {
+      width: 100%;
+      padding: 34px;
+      border-radius: 24px;
+
+      background:
+        linear-gradient(
+          145deg,
+          rgba(255, 248, 241, 0.96),
+          rgba(235, 231, 226, 0.96)
+        );
+
+      border: 1px solid rgba(90, 70, 60, 0.14);
+
+      box-shadow:
+        0 24px 70px rgba(55, 45, 40, 0.18),
+        0 4px 14px rgba(55, 45, 40, 0.08);
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .brand-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      border-radius: 18px;
+
+      background:
+        linear-gradient(
+          135deg,
+          #6f3e38,
+          #8d6156
+        );
+
+      color: #fff8f2;
+      font-size: 28px;
+
+      box-shadow:
+        0 12px 28px rgba(91, 54, 47, 0.24);
+    }
+
+    h1 {
+      margin: 0;
+      color: #352d2a;
+      font-size: 28px;
+      line-height: 1.2;
+      font-weight: 750;
+    }
+
+    .subtitle {
+      margin: 9px 0 0;
+      color: #706762;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #403834;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    input {
+      width: 100%;
+      min-height: 52px;
+      padding: 0 48px 0 15px;
+
+      border: 1px solid #cfc6c0;
+      border-radius: 13px;
+
+      background: rgba(255, 251, 247, 0.9);
+
+      color: #302b28;
+      font-size: 15px;
+
+      outline: none;
+
+      transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
+    }
+
+    input:focus {
+      border-color: #805047;
+
+      background: #fffaf5;
+
+      box-shadow:
+        0 0 0 4px rgba(128, 80, 71, 0.10);
+    }
+
+    input::placeholder {
+      color: #9a918c;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+
+      border: 0;
+      background: transparent;
+
+      color: #70635d;
+      cursor: pointer;
+
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .toggle-password:hover {
+      color: #5d3933;
+    }
+
+    .login-button {
+      width: 100%;
+      min-height: 53px;
+
+      border: 0;
+      border-radius: 13px;
+
+      background:
+        linear-gradient(
+          135deg,
+          #663a34,
+          #8b5b50
+        );
+
+      color: #fff;
+
+      font-size: 15px;
+      font-weight: 750;
+
+      cursor: pointer;
+
+      box-shadow:
+        0 10px 24px rgba(91, 54, 47, 0.22);
+
+      transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        opacity 0.15s ease;
+    }
+
+    .login-button:hover {
+      transform: translateY(-1px);
+
+      box-shadow:
+        0 13px 28px rgba(91, 54, 47, 0.28);
+    }
+
+    .login-button:active {
+      transform: translateY(0);
+    }
+
+    .login-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    .message {
+      display: none;
+
+      margin-top: 18px;
+      padding: 13px 14px;
+
+      border-radius: 12px;
+
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .message.error {
+      display: block;
+
+      color: #762f2f;
+
+      background: #f4dddd;
+
+      border: 1px solid #dfbcbc;
+    }
+
+    .message.success {
+      display: block;
+
+      color: #285d42;
+
+      background: #dceee3;
+
+      border: 1px solid #b9d9c5;
+    }
+
+    .security-note {
+      margin-top: 22px;
+      padding-top: 18px;
+
+      border-top: 1px solid rgba(90, 70, 60, 0.12);
+
+      text-align: center;
+
+      color: #817670;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .back-link {
+      display: block;
+
+      margin-top: 17px;
+
+      text-align: center;
+
+      color: #69473f;
+      text-decoration: none;
+
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .spinner {
+      display: inline-block;
+
+      width: 16px;
+      height: 16px;
+
+      margin-right: 7px;
+
+      vertical-align: -3px;
+
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+
+      border-radius: 50%;
+
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 520px) {
+      body {
+        padding: 16px;
+      }
+
+      .login-card {
+        padding: 26px 20px;
+        border-radius: 20px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="login-wrapper">
+
+    <section class="login-card">
+
+      <div class="brand">
+
+        <div class="brand-icon" aria-hidden="true">
+          🔐
+        </div>
+
+        <h1>Administrator Login</h1>
+
+        <p class="subtitle">
+          Secure access to the Application Management System
+        </p>
+
+      </div>
+
+
+      <form id="adminLoginForm" autocomplete="off">
+
+        <div class="form-group">
+
+          <label for="adminToken">
+            Administrator Token
+          </label>
+
+          <div class="input-wrapper">
+
+            <input
+              id="adminToken"
+              name="token"
+              type="password"
+              placeholder="Enter administrator token"
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+              required
+            >
+
+            <button
+              type="button"
+              class="toggle-password"
+              id="togglePassword"
+              aria-label="Show token"
+            >
+              Show
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <button
+          type="submit"
+          class="login-button"
+          id="loginButton"
+        >
+          Sign In
+        </button>
+
+      </form>
+
+
+      <div
+        id="message"
+        class="message"
+        role="alert"
+        aria-live="polite"
+      ></div>
+
+
+      <div class="security-note">
+        Administrator access is protected by server-side
+        authentication. Do not share your administrator token.
+      </div>
+
+
+      <a
+        href="/"
+        class="back-link"
+      >
+        ← Back to Application Form
+      </a>
+
+    </section>
+
+  </main>
+
+
+  <script>
+    "use strict";
+
+    /*
+     * =====================================================
+     * ADMIN LOGIN
+     * =====================================================
+     *
+     * Backend endpoint:
+     *
+     * POST /api/admin/login
+     *
+     * Expected response:
+     *
+     * {
+     *   success: true,
+     *   token: "...",
+     *   expiresIn: "8h"
+     * }
+     *
+     * =====================================================
+     */
+
+    const API_BASE = "";
+
+
+    const form =
+      document.getElementById(
+        "adminLoginForm"
+      );
+
+
+    const tokenInput =
+      document.getElementById(
+        "adminToken"
+      );
+
+
+    const loginButton =
+      document.getElementById(
+        "loginButton"
+      );
+
+
+    const message =
+      document.getElementById(
+        "message"
+      );
+
+
+    const togglePassword =
+      document.getElementById(
+        "togglePassword"
+      );
+
+
+    /*
+     * -----------------------------------------------------
+     * If an existing valid token is already stored,
+     * go directly to the admin dashboard.
+     * -----------------------------------------------------
+     */
+
+    const existingToken =
+      sessionStorage.getItem(
+        "adminToken"
+      );
+
+
+    if (existingToken) {
+
+      window.location.replace(
+        "/admin.html"
+      );
+
+    }
+
+
+    /*
+     * -----------------------------------------------------
+     * Show / hide token
+     * -----------------------------------------------------
+     */
+
+    togglePassword.addEventListener(
+      "click",
+      () => {
+
+        const hidden =
+          tokenInput.type === "password";
+
+
+        tokenInput.type =
+          hidden
+            ? "text"
+            : "password";
+
+
+        togglePassword.textContent =
+          hidden
+            ? "Hide"
+            : "Show";
+
+
+        togglePassword.setAttribute(
+          "aria-label",
+          hidden
+            ? "Hide token"
+            : "Show token"
+        );
+
+      }
+    );
+
+
+    /*
+     * -----------------------------------------------------
+     * Message helper
+     * -----------------------------------------------------
+     */
+
+    function showMessage(
+      text,
+      type = "error"
+    ) {
+
+      message.textContent =
+        text;
+
+      message.className =
+        `message ${type}`;
+
+    }
+
+
+    function clearMessage() {
+
+      message.textContent =
+        "";
+
+      message.className =
+        "message";
+
+    }
+
+
+    /*
+     * -----------------------------------------------------
+     * Login
+     * -----------------------------------------------------
+     */
+
+    form.addEventListener(
+      "submit",
+      async (event) => {
+
+        event.preventDefault();
+
+        clearMessage();
+
+
+        const token =
+          tokenInput.value.trim();
+
+
+        if (!token) {
+
+          showMessage(
+            "Please enter the administrator token."
+          );
+
+          tokenInput.focus();
+
+          return;
+
+        }
+
+
+        loginButton.disabled =
+          true;
+
+
+        loginButton.innerHTML =
+          '<span class="spinner"></span>Signing in...';
+
+
+        try {
+
+          const response =
+            await fetch(
+              `${API_BASE}/api/admin/login`,
+              {
+                method: "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json"
+                },
+
+                body:
+                  JSON.stringify({
+                    token
+                  })
+              }
+            );
+
+
+          let data = {};
+
+
+          try {
+
+            data =
+              await response.json();
+
+          } catch {
+
+            data = {};
+
+          }
+
+
+          if (
+            !response.ok ||
+            !data.success ||
+            !data.token
+          ) {
+
+            throw new Error(
+              data.error ||
+              "Administrator login failed."
+            );
+
+          }
+
+
+          /*
+           * Store only the server-generated
+           * JWT session token.
+           *
+           * The original ADMIN_TOKEN is
+           * never stored by this page.
+           */
+
+          sessionStorage.setItem(
+            "adminToken",
+            data.token
+          );
+
+
+          /*
+           * Optional compatibility key.
+           * This can be used by admin.html.
+           */
+
+          sessionStorage.setItem(
+            "adminAuthenticated",
+            "true"
+          );
+
+
+          showMessage(
+            "Login successful. Opening administrator dashboard...",
+            "success"
+          );
+
+
+          /*
+           * Give the success message a moment
+           * to render before redirecting.
+           */
+
+          setTimeout(
+            () => {
+
+              window.location.replace(
+                "/admin.html"
+              );
+
+            },
+            400
+          );
+
+
+        } catch(error) {
+
+          console.error(
+            "Admin login error:",
+            error
+          );
+
+
+          showMessage(
+            error.message ||
+            "Unable to connect to the server."
+          );
+
+
+          loginButton.disabled =
+            false;
+
+
+          loginButton.textContent =
+            "Sign In";
+
+        }
+
+      }
+    );
+
+  </script>
+
+</body>
+</html>
