@@ -1,3 +1,41 @@
+# Application Form Management System
+
+A secure, full-stack application management platform built with **HTML, CSS, JavaScript, Node.js, Express, PostgreSQL, file storage, PDF generation, administrator authentication, WRT/authorized-access controls, and optional AI integration**.
+
+---
+
+## 1. Project Overview
+
+This project provides a complete application submission and administration system.
+
+Applicants can:
+
+- Complete the master application form
+- Submit personal and application information
+- Upload photographs
+- Upload documents
+- Upload resumes/CVs
+- Receive a submission confirmation
+- Receive an application/reference ID
+
+Administrators can:
+
+- Log in through the administrator portal
+- View submitted applications
+- View application details
+- Download uploaded files
+- Generate application PDFs
+- Review application records
+- Manage authorized access requests
+- Request camera, microphone, or screen-sharing permissions where explicitly authorized by the user
+- Use authenticated API endpoints
+- Review application status and related information
+
+---
+
+# 2. Repository Structure
+
+```text
 application-form/
 │
 ├── public/
@@ -5,12 +43,6 @@ application-form/
 │   ├── admin-login.html
 │   ├── admin.html
 │   ├── success.html
-│   ├── manifest.json
-│   ├── service-worker.js
-│   │
-│   ├── icons/
-│   │   ├── icon-192.png
-│   │   └── icon-512.png
 │   │
 │   └── assets/
 │       ├── css/
@@ -18,11 +50,7 @@ application-form/
 │       │
 │       └── js/
 │           ├── form.js
-│           ├── admin.js
-│           ├── auth.js
-│           ├── permissions.js
-│           ├── uploads.js
-│           └── api.js
+│           └── permissions.js
 │
 ├── data/
 │   └── applications.json
@@ -30,11 +58,9 @@ application-form/
 ├── uploads/
 │   ├── photos/
 │   ├── documents/
-│   ├── resumes/
-│   └── generated-pdfs/
+│   └── resumes/
 │
 ├── server.js
 ├── package.json
-├── .env
 ├── .gitignore
 └── README.md
