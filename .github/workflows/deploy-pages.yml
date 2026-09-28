@@ -4,92 +4,59 @@ on:
   push:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: application-forms-pages
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
-
   build:
     name: Build Website
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
 
       - name: Prepare website
-        shell: bash
         run: |
-          set -e
-
           rm -rf _site
           mkdir -p _site
 
-          echo "Preparing Application Forms website..."
-
           cp -R public/. _site/
-
-          if [ -d "data" ]; then
-            echo "Copying data directory..."
-            mkdir -p _site/data
-            cp -R data/. _site/data/
-          fi
 
           touch _site/.nojekyll
 
-          echo "Deployment files:"
+          echo "===== DEPLOYMENT CONTENT ====="
           find _site -maxdepth 3 -type f | sort
 
-      - name: Verify website
-        shell: bash
-        run: |
-          set -e
-
-          if [ ! -f "_site/index.html" ]; then
-            echo "ERROR: index.html is missing."
-            exit 1
-          fi
-
-          if [ ! -f "_site/admin.html" ]; then
-            echo "ERROR: admin.html is missing."
-            exit 1
-          fi
-
-          echo "Website verification successful."
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./_site
 
   deploy:
     name: Deploy Website
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     needs: build
 
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Prepare deployment
-        shell: bash
-        run: |
-          set -e
-
-          rm -rf _site
-          mkdir -p _site
-
-          cp -R public/. _site/
-
-          if [ -d "data" ]; then
-            mkdir -p _site/data
-            cp -R data/. _site/data/
-          fi
-
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
           touch _site/.nojekyll
 
       - name: Deploy to GitHub Pages
