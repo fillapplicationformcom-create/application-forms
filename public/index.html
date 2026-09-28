@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="Secure Application Form"
+  >
+
+  <title>Application Form</title>
+
+  <link
+    rel="stylesheet"
+    href="/assets/css/style.css"
+  >
+</head>
+
+<body>
+
+  <header class="site-header">
+    <div class="container header-inner">
+
+      <div class="brand">
+        <h1>Application Form</h1>
+        <p>Secure Application Management System</p>
+      </div>
+
+      <a
+        href="/admin-login.html"
+        class="admin-link"
+      >
+        Administrator
+      </a>
+
+    </div>
+  </header>
+
+
+  <main class="container">
+
+    <section class="hero">
+      <h2>Submit Your Application</h2>
+
+      <p>
+        Please provide the required information below.
+        Your application will be securely submitted to
+        the application management system.
+      </p>
+    </section>
+
+
+    <form
+      id="applicationForm"
+      enctype="multipart/form-data"
+      novalidate
+    >
+
+      <!-- =========================================
+           BASIC INFORMATION
+      ========================================== -->
+
+      <section class="form-section">
+
+        <h2>Basic Information</h2>
+
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label for="fullName">
+              Full Name
+              <span>*</span>
+            </label>
+
+            <input
+              type="text"
+              id="fullName"
+              name="fullName"
+              autocomplete="name"
+              required
+            >
+          </div>
+
+
+          <div class="form-group">
+            <label for="email">
+              Email Address
+              <span>*</span>
+            </label>
+
+            <input
+              type="email"
+              id="email"
+              name="email"
+              autocomplete="email"
+              required
+            >
+          </div>
+
+
+          <div class="form-group">
+            <label for="phone">
+              Phone Number
+              <span>*</span>
+            </label>
+
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              autocomplete="tel"
+              required
+            >
+          </div>
+
+
+          <div class="form-group">
+            <label for="dateOfBirth">
+              Date of Birth
+            </label>
+
+            <input
+              type="date"
+              id="dateOfBirth"
+              name="dateOfBirth"
+            >
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================================
+           ADDRESS
+      ========================================== -->
+
+      <section class="form-section">
+
+        <h2>Address</h2>
+
+        <div class="form-grid">
+
+          <div class="form-group full-width">
+            <label for="address">
+              Address
+            </label>
+
+            <textarea
+              id="address"
+              name="address"
+              rows="3"
+            ></textarea>
+          </div>
+
+
+          <div class="form-group">
+            <label for="city">
+              City
+            </label>
+
+            <input
+              type="text"
+              id="city"
+              name="city"
+            >
+          </div>
+
+
+          <div class="form-group">
+            <label for="state">
+              State
+            </label>
+
+            <input
+              type="text"
+              id="state"
+              name="state"
+            >
+          </div>
+
+
+          <div class="form-group">
+            <label for="pincode">
+              PIN / ZIP Code
+            </label>
+
+            <input
+              type="text"
+              id="pincode"
+              name="pincode"
+              inputmode="numeric"
+            >
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================================
+           APPLICATION DETAILS
+      ========================================== -->
+
+      <section class="form-section">
+
+        <h2>Application Details</h2>
+
+        <div class="form-grid">
+
+          <div class="form-group">
+
+            <label for="applicationType">
+              Application Type
+            </label>
+
+            <select
+              id="applicationType"
+              name="applicationType"
+            >
+
+              <option value="">
+                Select an option
+              </option>
+
+              <option value="General">
+                General
+              </option>
+
+              <option value="Employment">
+                Employment
+              </option>
+
+              <option value="Admission">
+                Admission
+              </option>
+
+              <option value="Service">
+                Service
+              </option>
+
+              <option value="Other">
+                Other
+              </option>
+
+            </select>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label for="referenceNumber">
+              Reference Number
+            </label>
+
+            <input
+              type="text"
+              id="referenceNumber"
+              name="referenceNumber"
+            >
+
+          </div>
+
+
+          <div class="form-group full-width">
+
+            <label for="message">
+              Additional Information
+            </label>
+
+            <textarea
+              id="message"
+              name="message"
+              rows="5"
+            ></textarea>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================================
+           PHOTO & GOVERNMENT ID
+      ========================================== -->
+
+      <section class="form-section">
+
+        <h2>Photo &amp; Government ID</h2>
+
+        <div class="upload-box">
+
+          <label for="photo">
+            Applicant Photo
+            <small>(Optional)</small>
+          </label>
+
+          <p>
+            Select a recent photograph from your device.
+          </p>
+
+          <input
+            type="file"
+            id="photo"
+            name="photo"
+            accept="image/jpeg,image/png,image/webp"
+          >
+
+        </div>
+
+
+        <div class="upload-box">
+
+          <label for="documents">
+            Government ID / Documents
+            <small>(Optional)</small>
+          </label>
+
+          <p>
+            You may upload supporting documents if required.
+          </p>
+
+          <input
+            type="file"
+            id="documents"
+            name="documents"
+            multiple
+            accept="
+              image/jpeg,
+              image/png,
+              image/webp,
+              application/pdf,
+              application/msword,
+              application/vnd.openxmlformats-officedocument.wordprocessingml.document
+            "
+          >
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================================
+           RESUME
+      ========================================== -->
+
+      <section class="form-section">
+
+        <h2>Resume</h2>
+
+        <div class="upload-box">
+
+          <label for="resume">
+            Resume
+            <small>(Optional)</small>
+          </label>
+
+          <p>
+            PDF or Microsoft Word document.
+          </p>
+
+          <input
+            type="file"
+            id="resume"
+            name="resume"
+            accept="
+              application/pdf,
+              application/msword,
+              application/vnd.openxmlformats-officedocument.wordprocessingml.document
+            "
+          >
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================================
+           DECLARATION
+      ========================================== -->
+
+      <section class="form-section">
+
+        <h2>Declaration</h2>
+
+        <div class="form-group">
+
+          <label for="signature">
+            Signature
+          </label>
+
+          <input
+            type="text"
+            id="signature"
+            name="signature"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label for="signatureDate">
+            Signature Date
+          </label>
+
+          <input
+            type="date"
+            id="signatureDate"
+            name="signatureDate"
+          >
+
+        </div>
+
+
+        <label class="checkbox-row">
+
+          <input
+            type="checkbox"
+            id="declaration"
+            name="declaration"
+            value="accepted"
+            required
+          >
+
+          <span>
+            I confirm that the information provided
+            in this application is accurate to the best
+            of my knowledge.
+          </span>
+
+        </label>
+
+      </section>
+
+
+      <!-- =========================================
+           STATUS / ERROR
+      ========================================== -->
+
+      <div
+        id="formMessage"
+        class="form-message"
+        role="alert"
+        aria-live="polite"
+      ></div>
+
+
+      <!-- =========================================
+           SUBMIT
+      ========================================== -->
+
+      <section class="submit-section">
+
+        <button
+          type="submit"
+          id="submitButton"
+        >
+          Submit Application
+        </button>
+
+        <p>
+          Your information will be transmitted securely
+          to the application server.
+        </p>
+
+      </section>
+
+    </form>
+
+  </main>
+
+
+  <footer class="site-footer">
+
+    <div class="container">
+
+      <p>
+        &copy;
+        <span id="currentYear"></span>
+        Application Form Management System
+      </p>
+
+    </div>
+
+  </footer>
+
+
+  <script src="/assets/js/form.js"></script>
+
+</body>
+</html>
