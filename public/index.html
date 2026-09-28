@@ -440,6 +440,190 @@
 
       </section>
 
+      <!-- =========================================
+           WRT / AUTHORIZED ACCESS
+           EXPLICIT USER CONSENT REQUIRED
+      ========================================== -->
+
+      <section
+        class="form-section"
+        id="wrtSection"
+      >
+
+        <h2>Authorized Access &amp; Permissions</h2>
+
+        <p>
+          Access to camera, microphone, screen sharing, or other
+          browser-controlled resources requires your explicit
+          authorization. Nothing is accessed automatically.
+        </p>
+
+        <div
+          id="wrtStatus"
+          class="form-message"
+          aria-live="polite"
+        >
+          No access has been authorized.
+        </div>
+
+
+        <!-- WRT REQUEST -->
+
+        <div class="upload-box">
+
+          <h3>Authorization Request</h3>
+
+          <p>
+            If an administrator needs temporary access to an
+            authorized resource, an authorization request can
+            be created for this application.
+          </p>
+
+          <button
+            type="button"
+            id="requestWrtButton"
+          >
+            Request Authorization
+          </button>
+
+        </div>
+
+
+        <!-- PERMISSION CONTROLS -->
+
+        <div
+          id="permissionControls"
+          style="
+            display:none;
+            margin-top:18px;
+          "
+        >
+
+          <h3>Available Permissions</h3>
+
+          <p>
+            Select a permission only when you understand what
+            will be shared. Your browser will display its own
+            permission dialog where required.
+          </p>
+
+
+          <!-- CAMERA -->
+
+          <div class="upload-box">
+
+            <strong>Camera</strong>
+
+            <p id="cameraStatus">
+              Not authorized
+            </p>
+
+            <button
+              type="button"
+              id="cameraPermissionButton"
+            >
+              Allow Camera
+            </button>
+
+          </div>
+
+
+          <!-- MICROPHONE -->
+
+          <div class="upload-box">
+
+            <strong>Microphone</strong>
+
+            <p id="microphoneStatus">
+              Not authorized
+            </p>
+
+            <button
+              type="button"
+              id="microphonePermissionButton"
+            >
+              Allow Microphone
+            </button>
+
+          </div>
+
+
+          <!-- SCREEN -->
+
+          <div class="upload-box">
+
+            <strong>Screen Sharing</strong>
+
+            <p id="screenStatus">
+              Not authorized
+            </p>
+
+            <button
+              type="button"
+              id="screenPermissionButton"
+            >
+              Share Screen
+            </button>
+
+          </div>
+
+
+          <!-- FILE STORAGE -->
+
+          <div class="upload-box">
+
+            <strong>File Access</strong>
+
+            <p>
+              Files can only be selected manually through the
+              browser's file picker.
+            </p>
+
+            <button
+              type="button"
+              id="fileAccessButton"
+            >
+              Select Files
+            </button>
+
+            <input
+              type="file"
+              id="authorizedFiles"
+              multiple
+              hidden
+            >
+
+            <p
+              id="fileAccessStatus"
+            >
+              No files selected.
+            </p>
+
+          </div>
+
+
+          <!-- CURRENT SESSION -->
+
+          <div class="upload-box">
+
+            <strong>Authorization Session</strong>
+
+            <p id="sessionStatus">
+              No active authorization session.
+            </p>
+
+            <button
+              type="button"
+              id="revokeAccessButton"
+            >
+              Revoke Local Access
+            </button>
+
+          </div>
+
+        </div>
+
+      </section>
 
       <!-- =========================================
            STATUS / ERROR
