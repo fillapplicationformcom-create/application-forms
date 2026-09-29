@@ -137,29 +137,55 @@ if (NODE_ENV === "production") {
    CORS
 ========================================================= */
 
-const allowedOrigins =
+/* =========================================================
+   CORS
+========================================================= */
+
+const allowedOrigins = new Set(
   (process.env.ALLOWED_ORIGINS || "")
     .split(",")
     .map((item) => item.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+);
+
+/*
+ * Same-origin requests from this Render service are always allowed.
+ * Add your custom frontend/domain to ALLOWED_ORIGINS in Render
+ * when you use one.
+ */
+const defaultAllowedOrigins = new Set([
+  "https://application-forms-3br1.onrender.com"
+]);
 
 app.use(
   cors({
     origin: (origin, callback) => {
+
+      // Requests without an Origin header:
+      // curl, server-to-server requests, health checks, etc.
       if (!origin) {
         return callback(null, true);
       }
 
-      if (
-        NODE_ENV !== "production" &&
-        allowedOrigins.length === 0
-      ) {
+      // Allow Render service itself.
+      if (defaultAllowedOrigins.has(origin)) {
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      // Allow origins configured in Render environment variables.
+      if (allowedOrigins.has(origin)) {
         return callback(null, true);
       }
+
+      // Development mode.
+      if (NODE_ENV !== "production") {
+        return callback(null, true);
+      }
+
+      console.warn(
+        "Blocked CORS origin:",
+        origin
+      );
 
       return callback(
         new Error("Origin not allowed by CORS.")
@@ -169,7 +195,6 @@ app.use(
     credentials: false
   })
 );
-
 /* =========================================================
    BODY PARSERS
 ========================================================= */
