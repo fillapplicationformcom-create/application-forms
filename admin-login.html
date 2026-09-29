@@ -39,6 +39,7 @@
       align-items: center;
       justify-content: center;
       padding: 24px;
+
       background:
         radial-gradient(
           circle at 15% 20%,
@@ -147,7 +148,7 @@
     input {
       width: 100%;
       min-height: 52px;
-      padding: 0 48px 0 15px;
+      padding: 0 65px 0 15px;
 
       border: 1px solid #cfc6c0;
       border-radius: 13px;
@@ -158,11 +159,6 @@
       font-size: 15px;
 
       outline: none;
-
-      transition:
-        border-color 0.2s ease,
-        box-shadow 0.2s ease,
-        background 0.2s ease;
     }
 
     input:focus {
@@ -194,10 +190,6 @@
       font-weight: 650;
     }
 
-    .toggle-password:hover {
-      color: #5d3933;
-    }
-
     .login-button {
       width: 100%;
       min-height: 53px;
@@ -221,28 +213,11 @@
 
       box-shadow:
         0 10px 24px rgba(91, 54, 47, 0.22);
-
-      transition:
-        transform 0.15s ease,
-        box-shadow 0.15s ease,
-        opacity 0.15s ease;
-    }
-
-    .login-button:hover {
-      transform: translateY(-1px);
-
-      box-shadow:
-        0 13px 28px rgba(91, 54, 47, 0.28);
-    }
-
-    .login-button:active {
-      transform: translateY(0);
     }
 
     .login-button:disabled {
       cursor: not-allowed;
       opacity: 0.65;
-      transform: none;
     }
 
     .message {
@@ -261,9 +236,7 @@
       display: block;
 
       color: #762f2f;
-
       background: #f4dddd;
-
       border: 1px solid #dfbcbc;
     }
 
@@ -271,9 +244,7 @@
       display: block;
 
       color: #285d42;
-
       background: #dceee3;
-
       border: 1px solid #b9d9c5;
     }
 
@@ -292,7 +263,6 @@
 
     .back-link {
       display: block;
-
       margin-top: 17px;
 
       text-align: center;
@@ -302,10 +272,6 @@
 
       font-size: 13px;
       font-weight: 650;
-    }
-
-    .back-link:hover {
-      text-decoration: underline;
     }
 
     .spinner {
@@ -318,12 +284,12 @@
 
       vertical-align: -3px;
 
-      border: 2px solid rgba(255, 255, 255, 0.4);
+      border: 2px solid rgba(255,255,255,.4);
       border-top-color: #fff;
 
       border-radius: 50%;
 
-      animation: spin 0.7s linear infinite;
+      animation: spin .7s linear infinite;
     }
 
     @keyframes spin {
@@ -333,6 +299,7 @@
     }
 
     @media (max-width: 520px) {
+
       body {
         padding: 16px;
       }
@@ -345,414 +312,393 @@
       h1 {
         font-size: 24px;
       }
+
     }
   </style>
 </head>
 
 <body>
 
-  <main class="login-wrapper">
+<main class="login-wrapper">
 
-    <section class="login-card">
+  <section class="login-card">
 
-      <div class="brand">
+    <div class="brand">
 
-        <div class="brand-icon" aria-hidden="true">
-          🔐
+      <div class="brand-icon">
+        🔐
+      </div>
+
+      <h1>
+        Administrator Login
+      </h1>
+
+      <p class="subtitle">
+        Secure access to the Application Management System
+      </p>
+
+    </div>
+
+
+    <form
+      id="adminLoginForm"
+      autocomplete="off"
+    >
+
+      <div class="form-group">
+
+        <label for="adminToken">
+          Administrator Token
+        </label>
+
+        <div class="input-wrapper">
+
+          <input
+            id="adminToken"
+            name="token"
+            type="password"
+            placeholder="Enter administrator token"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          >
+
+          <button
+            type="button"
+            class="toggle-password"
+            id="togglePassword"
+          >
+            Show
+          </button>
+
         </div>
-
-        <h1>Administrator Login</h1>
-
-        <p class="subtitle">
-          Secure access to the Application Management System
-        </p>
 
       </div>
 
 
-      <form id="adminLoginForm" autocomplete="off">
-
-        <div class="form-group">
-
-          <label for="adminToken">
-            Administrator Token
-          </label>
-
-          <div class="input-wrapper">
-
-            <input
-              id="adminToken"
-              name="token"
-              type="password"
-              placeholder="Enter administrator token"
-              autocomplete="off"
-              autocapitalize="none"
-              spellcheck="false"
-              required
-            >
-
-            <button
-              type="button"
-              class="toggle-password"
-              id="togglePassword"
-              aria-label="Show token"
-            >
-              Show
-            </button>
-
-          </div>
-
-        </div>
-
-
-        <button
-          type="submit"
-          class="login-button"
-          id="loginButton"
-        >
-          Sign In
-        </button>
-
-      </form>
-
-
-      <div
-        id="message"
-        class="message"
-        role="alert"
-        aria-live="polite"
-      ></div>
-
-
-      <div class="security-note">
-        Administrator access is protected by server-side
-        authentication. Do not share your administrator token.
-      </div>
-
-
-      <a
-        href="/"
-        class="back-link"
+      <button
+        type="submit"
+        class="login-button"
+        id="loginButton"
       >
-        ← Back to Application Form
-      </a>
+        Sign In
+      </button>
 
-    </section>
-
-  </main>
+    </form>
 
 
-  <script>
-    "use strict";
-
-    /*
-     * =====================================================
-     * ADMIN LOGIN
-     * =====================================================
-     *
-     * Backend endpoint:
-     *
-     * POST /api/admin/login
-     *
-     * Expected response:
-     *
-     * {
-     *   success: true,
-     *   token: "...",
-     *   expiresIn: "8h"
-     * }
-     *
-     * =====================================================
-     */
-
-    const API_BASE = "";
+    <div
+      id="message"
+      class="message"
+      role="alert"
+      aria-live="polite"
+    ></div>
 
 
-    const form =
-      document.getElementById(
-        "adminLoginForm"
+    <div class="security-note">
+      Administrator access is protected by
+      server-side authentication.
+      Do not share your administrator token.
+    </div>
+
+
+    <a
+      href="/"
+      class="back-link"
+    >
+      ← Back to Application Form
+    </a>
+
+  </section>
+
+</main>
+
+
+<script>
+"use strict";
+
+
+/* =========================================================
+   API CONFIGURATION
+========================================================= */
+
+const API_BASE =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? ""
+    : "https://application-form-qtxc.onrender.com";
+
+
+/* =========================================================
+   DOM
+========================================================= */
+
+const form =
+  document.getElementById(
+    "adminLoginForm"
+  );
+
+const tokenInput =
+  document.getElementById(
+    "adminToken"
+  );
+
+const loginButton =
+  document.getElementById(
+    "loginButton"
+  );
+
+const message =
+  document.getElementById(
+    "message"
+  );
+
+const togglePassword =
+  document.getElementById(
+    "togglePassword"
+  );
+
+
+/* =========================================================
+   CLEAR OLD SESSION
+========================================================= */
+
+sessionStorage.removeItem(
+  "adminSession"
+);
+
+sessionStorage.removeItem(
+  "adminToken"
+);
+
+sessionStorage.removeItem(
+  "adminAuthenticated"
+);
+
+
+/* =========================================================
+   SHOW / HIDE TOKEN
+========================================================= */
+
+togglePassword.addEventListener(
+  "click",
+  () => {
+
+    const hidden =
+      tokenInput.type === "password";
+
+    tokenInput.type =
+      hidden
+        ? "text"
+        : "password";
+
+    togglePassword.textContent =
+      hidden
+        ? "Hide"
+        : "Show";
+
+  }
+);
+
+
+/* =========================================================
+   MESSAGE
+========================================================= */
+
+function showMessage(
+  text,
+  type = "error"
+) {
+
+  message.textContent =
+    text;
+
+  message.className =
+    "message " + type;
+
+}
+
+
+function clearMessage() {
+
+  message.textContent =
+    "";
+
+  message.className =
+    "message";
+
+}
+
+
+/* =========================================================
+   LOGIN
+========================================================= */
+
+form.addEventListener(
+  "submit",
+  async event => {
+
+    event.preventDefault();
+
+    clearMessage();
+
+
+    const token =
+      tokenInput.value.trim();
+
+
+    if (!token) {
+
+      showMessage(
+        "Please enter the administrator token."
       );
 
+      tokenInput.focus();
 
-    const tokenInput =
-      document.getElementById(
-        "adminToken"
-      );
-
-
-    const loginButton =
-      document.getElementById(
-        "loginButton"
-      );
-
-
-    const message =
-      document.getElementById(
-        "message"
-      );
-
-
-    const togglePassword =
-      document.getElementById(
-        "togglePassword"
-      );
-
-
-    /*
-     * -----------------------------------------------------
-     * If an existing valid token is already stored,
-     * go directly to the admin dashboard.
-     * -----------------------------------------------------
-     */
-
-    const existingToken =
-      sessionStorage.getItem(
-        "adminToken"
-      );
-
-
-    if (existingToken) {
-
-      window.location.replace(
-        "/admin.html"
-      );
+      return;
 
     }
 
 
-    /*
-     * -----------------------------------------------------
-     * Show / hide token
-     * -----------------------------------------------------
-     */
+    loginButton.disabled =
+      true;
 
-    togglePassword.addEventListener(
-      "click",
-      () => {
-
-        const hidden =
-          tokenInput.type === "password";
+    loginButton.innerHTML =
+      '<span class="spinner"></span>Signing in...';
 
 
-        tokenInput.type =
-          hidden
-            ? "text"
-            : "password";
+    try {
+
+      const response =
+        await fetch(
+          API_BASE +
+          "/api/admin/login",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              "Accept":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify({
+                token: token
+              })
+          }
+        );
 
 
-        togglePassword.textContent =
-          hidden
-            ? "Hide"
-            : "Show";
+      let data = {};
 
 
-        togglePassword.setAttribute(
-          "aria-label",
-          hidden
-            ? "Hide token"
-            : "Show token"
+      try {
+
+        data =
+          await response.json();
+
+      } catch {
+
+        data = {};
+
+      }
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          data.error ||
+          data.message ||
+          `Login failed (${response.status}).`
         );
 
       }
-    );
 
 
-    /*
-     * -----------------------------------------------------
-     * Message helper
-     * -----------------------------------------------------
-     */
+      if (
+        !data.success ||
+        !data.token
+      ) {
 
-    function showMessage(
-      text,
-      type = "error"
-    ) {
-
-      message.textContent =
-        text;
-
-      message.className =
-        `message ${type}`;
-
-    }
-
-
-    function clearMessage() {
-
-      message.textContent =
-        "";
-
-      message.className =
-        "message";
-
-    }
-
-
-    /*
-     * -----------------------------------------------------
-     * Login
-     * -----------------------------------------------------
-     */
-
-    form.addEventListener(
-      "submit",
-      async (event) => {
-
-        event.preventDefault();
-
-        clearMessage();
-
-
-        const token =
-          tokenInput.value.trim();
-
-
-        if (!token) {
-
-          showMessage(
-            "Please enter the administrator token."
-          );
-
-          tokenInput.focus();
-
-          return;
-
-        }
-
-
-        loginButton.disabled =
-          true;
-
-
-        loginButton.innerHTML =
-          '<span class="spinner"></span>Signing in...';
-
-
-        try {
-
-          const response =
-            await fetch(
-              `${API_BASE}/api/admin/login`,
-              {
-                method: "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json"
-                },
-
-                body:
-                  JSON.stringify({
-                    token
-                  })
-              }
-            );
-
-
-          let data = {};
-
-
-          try {
-
-            data =
-              await response.json();
-
-          } catch {
-
-            data = {};
-
-          }
-
-
-          if (
-            !response.ok ||
-            !data.success ||
-            !data.token
-          ) {
-
-            throw new Error(
-              data.error ||
-              "Administrator login failed."
-            );
-
-          }
-
-
-          /*
-           * Store only the server-generated
-           * JWT session token.
-           *
-           * The original ADMIN_TOKEN is
-           * never stored by this page.
-           */
-
-          sessionStorage.setItem(
-            "adminToken",
-            data.token
-          );
-
-
-          /*
-           * Optional compatibility key.
-           * This can be used by admin.html.
-           */
-
-          sessionStorage.setItem(
-            "adminAuthenticated",
-            "true"
-          );
-
-
-          showMessage(
-            "Login successful. Opening administrator dashboard...",
-            "success"
-          );
-
-
-          /*
-           * Give the success message a moment
-           * to render before redirecting.
-           */
-
-          setTimeout(
-            () => {
-
-              window.location.replace(
-                "/admin.html"
-              );
-
-            },
-            400
-          );
-
-
-        } catch(error) {
-
-          console.error(
-            "Admin login error:",
-            error
-          );
-
-
-          showMessage(
-            error.message ||
-            "Unable to connect to the server."
-          );
-
-
-          loginButton.disabled =
-            false;
-
-
-          loginButton.textContent =
-            "Sign In";
-
-        }
+        throw new Error(
+          data.error ||
+          "Server did not return a valid administrator session."
+        );
 
       }
-    );
 
-  </script>
+
+      /*
+       * IMPORTANT:
+       *
+       * admin.html reads "adminSession".
+       *
+       * Therefore the login page MUST store
+       * the returned server token under exactly
+       * the same key.
+       */
+
+      sessionStorage.setItem(
+        "adminSession",
+        data.token
+      );
+
+
+      sessionStorage.setItem(
+        "adminAuthenticated",
+        "true"
+      );
+
+
+      showMessage(
+        "Login successful. Opening administrator dashboard...",
+        "success"
+      );
+
+
+      setTimeout(
+        () => {
+
+          window.location.replace(
+            "/admin.html"
+          );
+
+        },
+        300
+      );
+
+
+    } catch(error) {
+
+      console.error(
+        "Administrator login error:",
+        error
+      );
+
+
+      showMessage(
+        error.message ||
+        "Unable to connect to the authentication server.",
+        "error"
+      );
+
+
+      loginButton.disabled =
+        false;
+
+      loginButton.textContent =
+        "Sign In";
+
+    }
+
+  }
+);
+
+</script>
 
 </body>
 </html>
