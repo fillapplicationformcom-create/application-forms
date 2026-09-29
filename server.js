@@ -4,7 +4,6 @@
 ============================================================
 APPLICATION FORM MANAGEMENT SYSTEM
 SERVER.JS
-============================================================
 
 Node.js 20+
 Express
@@ -16,16 +15,15 @@ WRT / explicit authorization
 Audit logging
 AI API integration
 
-FRONTEND:
-index.html is in project root.
+Frontend:
+index.html in project root
 
 API:
 Same-origin /api
 
 IMPORTANT:
-Do not put ADMIN_TOKEN, SESSION_SECRET or AI_API_KEY
-inside frontend JavaScript.
-They belong only in Render Environment Variables.
+ADMIN_TOKEN, SESSION_SECRET and AI_API_KEY
+must be stored in Render Environment Variables.
 ============================================================
 */
 
@@ -92,27 +90,19 @@ console.log(
 );
 
 console.log(
-  `Database configured: ${Boolean(
-    DATABASE_URL
-  )}`
+  `Database configured: ${Boolean(DATABASE_URL)}`
 );
 
 console.log(
-  `Admin token configured: ${Boolean(
-    ADMIN_TOKEN
-  )}`
+  `Admin token configured: ${Boolean(ADMIN_TOKEN)}`
 );
 
 console.log(
-  `Session secret configured: ${Boolean(
-    SESSION_SECRET
-  )}`
+  `Session secret configured: ${Boolean(SESSION_SECRET)}`
 );
 
 console.log(
-  `AI configured: ${Boolean(
-    AI_API_KEY
-  )}`
+  `AI configured: ${Boolean(AI_API_KEY)}`
 );
 
 console.log(
@@ -239,7 +229,7 @@ const pool =
 
 
 /* =========================================================
-   EXPRESS BASIC SETTINGS
+   EXPRESS SETTINGS
 ========================================================= */
 
 app.disable(
@@ -260,16 +250,9 @@ if (
    CORS
 ========================================================= */
 
-/*
-The application normally uses SAME-ORIGIN requests.
-
-The Render frontend is also explicitly allowed.
-*/
-
 const allowedOrigins = new Set([
   "https://application-forms-1-yt65.onrender.com"
 ]);
-
 
 app.use(
   cors({
@@ -279,11 +262,6 @@ app.use(
         origin,
         callback
       ) {
-
-        /*
-        Browser requests from the same origin
-        normally do not need CORS handling.
-        */
 
         if (!origin) {
           return callback(
@@ -302,11 +280,6 @@ app.use(
             true
           );
         }
-
-        /*
-        Do not crash the application because
-        of an unknown Origin.
-        */
 
         return callback(
           null,
@@ -447,7 +420,7 @@ const accessLimiter =
 
 
 /* =========================================================
-   MULTER
+   MULTER STORAGE
 ========================================================= */
 
 const storage =
@@ -461,10 +434,8 @@ const storage =
       ) => {
 
         if (
-          file.fieldname ===
-            "photo" ||
-          file.fieldname ===
-            "photoFile"
+          file.fieldname === "photo" ||
+          file.fieldname === "photoFile"
         ) {
 
           return callback(
@@ -474,12 +445,9 @@ const storage =
 
         }
 
-
         if (
-          file.fieldname ===
-            "resume" ||
-          file.fieldname ===
-            "resumeFile"
+          file.fieldname === "resume" ||
+          file.fieldname === "resumeFile"
         ) {
 
           return callback(
@@ -489,14 +457,12 @@ const storage =
 
         }
 
-
         return callback(
           null,
           DOCUMENTS_DIR
         );
 
       },
-
 
     filename:
       (
@@ -510,12 +476,10 @@ const storage =
             file.originalname
           ).toLowerCase();
 
-
         const randomName =
           crypto
             .randomBytes(18)
             .toString("hex");
-
 
         callback(
           null,
@@ -555,7 +519,8 @@ const upload =
       fileSize:
         10 * 1024 * 1024,
 
-      files: 20
+      files:
+        20
 
     },
 
@@ -637,17 +602,13 @@ function generateApplicationId() {
       .toString(36)
       .toUpperCase();
 
-
   const random =
     crypto
       .randomBytes(5)
       .toString("hex")
       .toUpperCase();
 
-
-  return (
-    `APP-${timestamp}-${random}`
-  );
+  return `APP-${timestamp}-${random}`;
 
 }
 
@@ -657,37 +618,31 @@ function safeJsonParse(
 ) {
 
   if (
-    typeof value !==
-    "string"
+    typeof value !== "string"
   ) {
 
     return (
       value &&
-      typeof value ===
-        "object"
+      typeof value === "object"
         ? value
         : {}
     );
 
   }
 
-
   try {
 
     const parsed =
       JSON.parse(value);
 
-
     if (
       parsed &&
-      typeof parsed ===
-        "object"
+      typeof parsed === "object"
     ) {
 
       return parsed;
 
     }
-
 
     return {};
 
@@ -708,7 +663,6 @@ function getUploadedFiles(
     return [];
   }
 
-
   return Object.values(
     files
   )
@@ -721,12 +675,9 @@ function getUploadedFiles(
         let category =
           "document";
 
-
         if (
-          file.fieldname ===
-            "photo" ||
-          file.fieldname ===
-            "photoFile"
+          file.fieldname === "photo" ||
+          file.fieldname === "photoFile"
         ) {
 
           category =
@@ -734,19 +685,15 @@ function getUploadedFiles(
 
         }
 
-
         if (
-          file.fieldname ===
-            "resume" ||
-          file.fieldname ===
-            "resumeFile"
+          file.fieldname === "resume" ||
+          file.fieldname === "resumeFile"
         ) {
 
           category =
             "resume";
 
         }
-
 
         return {
           file,
@@ -766,7 +713,6 @@ function cleanupUploadedFiles(
   if (!files) {
     return;
   }
-
 
   for (
     const file of
@@ -837,13 +783,11 @@ function isInsideDirectory(
       directory
     );
 
-
   const relative =
     path.relative(
       resolvedDirectory,
       resolvedFile
     );
-
 
   return (
     relative !== "" &&
@@ -870,10 +814,10 @@ function createAdminSession() {
 
   }
 
-
   return jwt.sign(
     {
-      role: "admin"
+      role:
+        "admin"
     },
 
     SESSION_SECRET,
@@ -895,9 +839,7 @@ function requireAdmin(
 ) {
 
   const authorization =
-    req.headers.authorization ||
-    "";
-
+    req.headers.authorization || "";
 
   if (
     !authorization.startsWith(
@@ -914,12 +856,10 @@ function requireAdmin(
 
   }
 
-
   const token =
     authorization.substring(
       7
     );
-
 
   if (!token) {
 
@@ -932,7 +872,6 @@ function requireAdmin(
 
   }
 
-
   try {
 
     if (!SESSION_SECRET) {
@@ -943,17 +882,14 @@ function requireAdmin(
 
     }
 
-
     const decoded =
       jwt.verify(
         token,
         SESSION_SECRET
       );
 
-
     if (
-      decoded.role !==
-      "admin"
+      decoded.role !== "admin"
     ) {
 
       return res
@@ -965,10 +901,8 @@ function requireAdmin(
 
     }
 
-
     req.admin =
       decoded;
-
 
     return next();
 
@@ -1001,7 +935,6 @@ async function writeAuditLog(
   if (!pool) {
     return;
   }
-
 
   try {
 
@@ -1057,7 +990,6 @@ async function initializeDatabase() {
 
   }
 
-
   await pool.query(
     `
     CREATE TABLE IF NOT EXISTS applications (
@@ -1080,7 +1012,6 @@ async function initializeDatabase() {
     );
     `
   );
-
 
   await pool.query(
     `
@@ -1109,7 +1040,6 @@ async function initializeDatabase() {
     `
   );
 
-
   await pool.query(
     `
     CREATE TABLE IF NOT EXISTS access_requests (
@@ -1135,7 +1065,6 @@ async function initializeDatabase() {
     `
   );
 
-
   await pool.query(
     `
     CREATE TABLE IF NOT EXISTS audit_logs (
@@ -1155,7 +1084,6 @@ async function initializeDatabase() {
     `
   );
 
-
   await pool.query(
     `
     CREATE INDEX IF NOT EXISTS
@@ -1163,7 +1091,6 @@ async function initializeDatabase() {
     ON applications(created_at DESC);
     `
   );
-
 
   await pool.query(
     `
@@ -1173,7 +1100,6 @@ async function initializeDatabase() {
     `
   );
 
-
   await pool.query(
     `
     CREATE INDEX IF NOT EXISTS
@@ -1182,7 +1108,6 @@ async function initializeDatabase() {
     `
   );
 
-
   await pool.query(
     `
     CREATE INDEX IF NOT EXISTS
@@ -1190,7 +1115,6 @@ async function initializeDatabase() {
     ON audit_logs(created_at DESC);
     `
   );
-
 
   console.log(
     "PostgreSQL database initialized successfully."
@@ -1213,7 +1137,6 @@ app.get(
 
     let database =
       "unavailable";
-
 
     if (pool) {
 
@@ -1241,7 +1164,6 @@ app.get(
       }
 
     }
-
 
     return res.json({
 
@@ -1301,13 +1223,11 @@ app.post(
 
       }
 
-
       const suppliedToken =
         typeof req.body?.token ===
           "string"
           ? req.body.token.trim()
           : "";
-
 
       if (!suppliedToken) {
 
@@ -1320,20 +1240,17 @@ app.post(
 
       }
 
-
       const supplied =
         Buffer.from(
           suppliedToken,
           "utf8"
         );
 
-
       const expected =
         Buffer.from(
           ADMIN_TOKEN,
           "utf8"
         );
-
 
       const valid =
         supplied.length ===
@@ -1343,13 +1260,11 @@ app.post(
           expected
         );
 
-
       if (!valid) {
 
         await writeAuditLog(
           "admin_login_failed"
         );
-
 
         return res
           .status(401)
@@ -1360,15 +1275,12 @@ app.post(
 
       }
 
-
       const sessionToken =
         createAdminSession();
-
 
       await writeAuditLog(
         "admin_login_success"
       );
-
 
       return res.json({
 
@@ -1391,7 +1303,6 @@ app.post(
         "Admin login error:",
         error
       );
-
 
       return res
         .status(500)
@@ -1424,7 +1335,6 @@ app.post(
       "admin_logout"
     );
 
-
     return res.json({
       success:
         true
@@ -1456,7 +1366,6 @@ app.post(
         req.files
       );
 
-
       return res
         .status(503)
         .json({
@@ -1466,10 +1375,8 @@ app.post(
 
     }
 
-
     const client =
       await pool.connect();
-
 
     try {
 
@@ -1480,17 +1387,14 @@ app.post(
           "{}"
         );
 
-
       const ordinaryFields =
         {
           ...req.body
         };
 
-
       delete ordinaryFields.data;
 
       delete ordinaryFields.applicationData;
-
 
       const combinedData =
         {
@@ -1503,19 +1407,15 @@ app.post(
             : {})
         };
 
-
       const applicationUUID =
         crypto.randomUUID();
-
 
       const applicationId =
         generateApplicationId();
 
-
       await client.query(
         "BEGIN"
       );
-
 
       await client.query(
         `
@@ -1538,16 +1438,13 @@ app.post(
         ]
       );
 
-
       const uploaded =
         getUploadedFiles(
           req.files
         );
 
-
       const savedFiles =
         [];
-
 
       for (
         const item of
@@ -1557,17 +1454,14 @@ app.post(
         const file =
           item.file;
 
-
         const relativePath =
           path.relative(
             ROOT_DIR,
             file.path
           );
 
-
         const fileUUID =
           crypto.randomUUID();
-
 
         await client.query(
           `
@@ -1606,7 +1500,6 @@ app.post(
           ]
         );
 
-
         savedFiles.push({
 
           id:
@@ -1628,11 +1521,9 @@ app.post(
 
       }
 
-
       await client.query(
         "COMMIT"
       );
-
 
       await writeAuditLog(
         "application_submitted",
@@ -1641,7 +1532,6 @@ app.post(
           applicationId
         }
       );
-
 
       return res
         .status(201)
@@ -1678,17 +1568,14 @@ app.post(
 
       } catch {}
 
-
       cleanupUploadedFiles(
         req.files
       );
-
 
       console.error(
         "Application submission error:",
         error
       );
-
 
       return res
         .status(500)
@@ -1734,7 +1621,6 @@ app.get(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -1749,7 +1635,6 @@ app.get(
           ORDER BY created_at DESC
           `
         );
-
 
       return res.json({
 
@@ -1769,7 +1654,6 @@ app.get(
         "Application list error:",
         error
       );
-
 
       return res
         .status(500)
@@ -1811,7 +1695,6 @@ app.get(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -1833,7 +1716,6 @@ app.get(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -1848,10 +1730,8 @@ app.get(
 
       }
 
-
       const application =
         result.rows[0];
-
 
       const files =
         await pool.query(
@@ -1872,7 +1752,6 @@ app.get(
           ]
         );
 
-
       await writeAuditLog(
         "application_viewed",
         application.id,
@@ -1881,7 +1760,6 @@ app.get(
             application.application_id
         }
       );
-
 
       return res.json({
 
@@ -1903,7 +1781,6 @@ app.get(
         "Application retrieval error:",
         error
       );
-
 
       return res
         .status(500)
@@ -1945,7 +1822,6 @@ app.patch(
 
       }
 
-
       const allowedStatuses =
         [
 
@@ -1965,13 +1841,11 @@ app.patch(
 
         ];
 
-
       const status =
         String(
           req.body?.status ||
           ""
         ).trim();
-
 
       if (
         !allowedStatuses.includes(
@@ -1987,7 +1861,6 @@ app.patch(
           });
 
       }
-
 
       const result =
         await pool.query(
@@ -2011,7 +1884,6 @@ app.patch(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -2026,10 +1898,8 @@ app.patch(
 
       }
 
-
       const application =
         result.rows[0];
-
 
       await writeAuditLog(
         "application_status_changed",
@@ -2038,7 +1908,6 @@ app.patch(
           status
         }
       );
-
 
       return res.json({
 
@@ -2057,7 +1926,6 @@ app.patch(
         "Status update error:",
         error
       );
-
 
       return res
         .status(500)
@@ -2099,7 +1967,6 @@ app.get(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -2123,7 +1990,6 @@ app.get(
           ]
         );
 
-
       return res.json({
 
         success:
@@ -2142,7 +2008,6 @@ app.get(
         "File list error:",
         error
       );
-
 
       return res
         .status(500)
@@ -2184,7 +2049,6 @@ app.get(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -2203,7 +2067,6 @@ app.get(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -2218,17 +2081,14 @@ app.get(
 
       }
 
-
       const file =
         result.rows[0];
-
 
       const absolutePath =
         path.resolve(
           ROOT_DIR,
           file.relative_path
         );
-
 
       if (
         !isInsideDirectory(
@@ -2246,7 +2106,6 @@ app.get(
 
       }
 
-
       if (
         !fs.existsSync(
           absolutePath
@@ -2262,13 +2121,11 @@ app.get(
 
       }
 
-
       res.setHeader(
         "Content-Type",
         file.mime_type ||
           "application/octet-stream"
       );
-
 
       res.setHeader(
         "Content-Disposition",
@@ -2276,7 +2133,6 @@ app.get(
           file.original_name
         )}"`
       );
-
 
       await writeAuditLog(
         "file_accessed",
@@ -2286,7 +2142,6 @@ app.get(
             file.id
         }
       );
-
 
       return res.sendFile(
         absolutePath
@@ -2300,7 +2155,6 @@ app.get(
         "File access error:",
         error
       );
-
 
       return res
         .status(500)
@@ -2342,7 +2196,6 @@ app.get(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -2364,7 +2217,6 @@ app.get(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -2379,10 +2231,8 @@ app.get(
 
       }
 
-
       const application =
         result.rows[0];
-
 
       const files =
         await pool.query(
@@ -2401,7 +2251,6 @@ app.get(
           ]
         );
 
-
       const doc =
         new PDFDocument({
 
@@ -2413,12 +2262,10 @@ app.get(
 
         });
 
-
       res.setHeader(
         "Content-Type",
         "application/pdf"
       );
-
 
       res.setHeader(
         "Content-Disposition",
@@ -2427,11 +2274,9 @@ app.get(
         )}.pdf"`
       );
 
-
       doc.pipe(
         res
       );
-
 
       doc
         .fontSize(20)
@@ -2443,9 +2288,7 @@ app.get(
           }
         );
 
-
       doc.moveDown();
-
 
       doc
         .fontSize(11)
@@ -2453,11 +2296,9 @@ app.get(
           `Application ID: ${application.application_id}`
         );
 
-
       doc.text(
         `Status: ${application.status}`
       );
-
 
       doc.text(
         `Submitted: ${new Date(
@@ -2467,9 +2308,7 @@ app.get(
         )}`
       );
 
-
       doc.moveDown();
-
 
       doc
         .fontSize(14)
@@ -2477,21 +2316,17 @@ app.get(
           "Applicant Information"
         );
 
-
       doc.moveDown(
         0.5
       );
-
 
       const applicantData =
         application.applicant_data ||
         {};
 
-
       doc.fontSize(
         10
       );
-
 
       for (
         const [
@@ -2505,15 +2340,13 @@ app.get(
         let printable =
           "";
 
-
         if (
           value !== null &&
           value !== undefined
         ) {
 
           printable =
-            typeof value ===
-              "object"
+            typeof value === "object"
               ? JSON.stringify(
                   value
                 )
@@ -2523,16 +2356,13 @@ app.get(
 
         }
 
-
         doc.text(
           `${key}: ${printable}`
         );
 
       }
 
-
       doc.moveDown();
-
 
       doc
         .fontSize(14)
@@ -2540,16 +2370,13 @@ app.get(
           "Uploaded Files"
         );
 
-
       doc.moveDown(
         0.5
       );
 
-
       doc.fontSize(
         10
       );
-
 
       if (
         files.rows.length ===
@@ -2575,9 +2402,7 @@ app.get(
 
       }
 
-
       doc.moveDown();
-
 
       doc
         .fontSize(8)
@@ -2589,9 +2414,7 @@ app.get(
           }
         );
 
-
       doc.end();
-
 
       await writeAuditLog(
         "application_pdf_generated",
@@ -2610,7 +2433,6 @@ app.get(
         "PDF generation error:",
         error
       );
-
 
       if (
         !res.headersSent
@@ -2660,13 +2482,11 @@ app.post(
 
       }
 
-
       const type =
         String(
           req.body?.type ||
           "wrt"
         ).trim();
-
 
       const application =
         await pool.query(
@@ -2685,7 +2505,6 @@ app.post(
           ]
         );
 
-
       if (
         application.rows.length ===
         0
@@ -2700,10 +2519,8 @@ app.post(
 
       }
 
-
       const row =
         application.rows[0];
-
 
       await pool.query(
         `
@@ -2720,10 +2537,8 @@ app.post(
         ]
       );
 
-
       const requestId =
         crypto.randomUUID();
-
 
       const result =
         await pool.query(
@@ -2759,7 +2574,6 @@ app.post(
           ]
         );
 
-
       await writeAuditLog(
         "wrt_access_requested",
         row.id,
@@ -2767,7 +2581,6 @@ app.post(
           type
         }
       );
-
 
       return res
         .status(201)
@@ -2792,7 +2605,6 @@ app.post(
         "Access request error:",
         error
       );
-
 
       return res
         .status(500)
@@ -2834,7 +2646,6 @@ app.get(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -2856,7 +2667,6 @@ app.get(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -2871,18 +2681,15 @@ app.get(
 
       }
 
-
       const request =
         result.rows[0];
-
 
       if (
         request.expires_at &&
         new Date(
           request.expires_at
         ) < new Date() &&
-        request.status ===
-          "pending"
+        request.status === "pending"
       ) {
 
         await pool.query(
@@ -2896,12 +2703,10 @@ app.get(
           ]
         );
 
-
         request.status =
           "expired";
 
       }
-
 
       return res.json({
 
@@ -2940,7 +2745,6 @@ app.get(
         "Access lookup error:",
         error
       );
-
 
       return res
         .status(500)
@@ -2982,7 +2786,6 @@ app.post(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -3018,7 +2821,6 @@ app.post(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -3033,10 +2835,8 @@ app.post(
 
       }
 
-
       const request =
         result.rows[0];
-
 
       await writeAuditLog(
         "wrt_user_approved",
@@ -3046,7 +2846,6 @@ app.post(
             request.id
         }
       );
-
 
       return res.json({
 
@@ -3068,7 +2867,6 @@ app.post(
         "Approval error:",
         error
       );
-
 
       return res
         .status(500)
@@ -3110,7 +2908,6 @@ app.post(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -3135,7 +2932,6 @@ app.post(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -3150,10 +2946,8 @@ app.post(
 
       }
 
-
       const request =
         result.rows[0];
-
 
       await writeAuditLog(
         "wrt_user_denied",
@@ -3163,7 +2957,6 @@ app.post(
             request.id
         }
       );
-
 
       return res.json({
 
@@ -3185,7 +2978,6 @@ app.post(
         "Denial error:",
         error
       );
-
 
       return res
         .status(500)
@@ -3227,7 +3019,6 @@ app.get(
 
       }
 
-
       const application =
         await pool.query(
           `
@@ -3243,7 +3034,6 @@ app.get(
           ]
         );
 
-
       if (
         application.rows.length ===
         0
@@ -3258,10 +3048,8 @@ app.get(
 
       }
 
-
       const applicationId =
         application.rows[0].id;
-
 
       const result =
         await pool.query(
@@ -3282,10 +3070,8 @@ app.get(
           ]
         );
 
-
       const requests =
         result.rows;
-
 
       const active =
         requests.find(
@@ -3302,7 +3088,6 @@ app.get(
 
             }
 
-
             if (
               !request.expires_at
             ) {
@@ -3310,7 +3095,6 @@ app.get(
               return true;
 
             }
-
 
             return (
               new Date(
@@ -3322,21 +3106,16 @@ app.get(
           }
         );
 
-
       return res.json({
 
         success:
           true,
 
         authorized:
-          Boolean(
-            active
-          ),
+          Boolean(active),
 
         wrt:
-          Boolean(
-            active
-          ),
+          Boolean(active),
 
         requests
 
@@ -3350,7 +3129,6 @@ app.get(
         "Access status error:",
         error
       );
-
 
       return res
         .status(500)
@@ -3392,7 +3170,6 @@ app.patch(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -3422,7 +3199,6 @@ app.patch(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -3437,10 +3213,8 @@ app.patch(
 
       }
 
-
       const request =
         result.rows[0];
-
 
       await writeAuditLog(
         "wrt_admin_approved",
@@ -3450,7 +3224,6 @@ app.patch(
             request.id
         }
       );
-
 
       return res.json({
 
@@ -3469,7 +3242,6 @@ app.patch(
         "Admin approval error:",
         error
       );
-
 
       return res
         .status(500)
@@ -3511,7 +3283,6 @@ app.patch(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -3528,7 +3299,6 @@ app.patch(
           ]
         );
 
-
       if (
         result.rows.length ===
         0
@@ -3543,10 +3313,8 @@ app.patch(
 
       }
 
-
       const request =
         result.rows[0];
-
 
       await writeAuditLog(
         "wrt_admin_denied",
@@ -3556,7 +3324,6 @@ app.patch(
             request.id
         }
       );
-
 
       return res.json({
 
@@ -3575,7 +3342,6 @@ app.patch(
         "Admin denial error:",
         error
       );
-
 
       return res
         .status(500)
@@ -3617,7 +3383,6 @@ app.get(
 
       }
 
-
       const result =
         await pool.query(
           `
@@ -3632,7 +3397,6 @@ app.get(
           LIMIT 500
           `
         );
-
 
       return res.json({
 
@@ -3652,7 +3416,6 @@ app.get(
         "Audit log retrieval error:",
         error
       );
-
 
       return res
         .status(500)
@@ -3694,15 +3457,12 @@ app.post(
 
       }
 
-
       const input =
         req.body?.input;
 
-
       if (
         !input ||
-        typeof input !==
-          "string"
+        typeof input !== "string"
       ) {
 
         return res
@@ -3713,7 +3473,6 @@ app.post(
           });
 
       }
-
 
       const response =
         await fetch(
@@ -3771,10 +3530,8 @@ app.post(
           }
         );
 
-
       const data =
         await response.json();
-
 
       if (
         !response.ok
@@ -3785,7 +3542,6 @@ app.post(
           data
         );
 
-
         return res
           .status(502)
           .json({
@@ -3795,7 +3551,6 @@ app.post(
 
       }
 
-
       const answer =
         data?.choices?.[0]
           ?.message?.content ||
@@ -3803,7 +3558,6 @@ app.post(
           ?.content?.[0]
           ?.text ||
         "";
-
 
       if (!answer) {
 
@@ -3816,7 +3570,6 @@ app.post(
 
       }
 
-
       await writeAuditLog(
         "ai_analysis_requested",
         null,
@@ -3825,7 +3578,6 @@ app.post(
             AI_MODEL
         }
       );
-
 
       return res.json({
 
@@ -3849,7 +3601,6 @@ app.post(
         error
       );
 
-
       return res
         .status(500)
         .json({
@@ -3867,24 +3618,6 @@ app.post(
    STATIC FRONTEND SECURITY
 ========================================================= */
 
-/*
-IMPORTANT:
-
-The frontend is in the project root.
-
-We cannot simply expose everything in the root because
-that could expose:
-
-- .env
-- server.js
-- data
-- uploads
-- package files
-- node_modules
-
-Therefore sensitive paths are blocked.
-*/
-
 app.use(
   (
     req,
@@ -3892,11 +3625,24 @@ app.use(
     next
   ) => {
 
-    const pathname =
-      decodeURIComponent(
-        req.path
-      );
+    let pathname;
 
+    try {
+
+      pathname =
+        decodeURIComponent(
+          req.path
+        );
+
+    } catch {
+
+      return res
+        .status(400)
+        .send(
+          "Bad Request"
+        );
+
+    }
 
     const blocked =
       [
@@ -3921,19 +3667,16 @@ app.use(
 
       ];
 
-
     const isBlocked =
       blocked.some(
         (
           item
         ) =>
-          pathname ===
-            item ||
+          pathname === item ||
           pathname.startsWith(
             item + "/"
           )
       );
-
 
     if (
       isBlocked
@@ -3946,7 +3689,6 @@ app.use(
         );
 
     }
-
 
     if (
       pathname.startsWith(
@@ -3961,7 +3703,6 @@ app.use(
         );
 
     }
-
 
     next();
 
@@ -4009,7 +3750,6 @@ app.get(
         );
 
     }
-
 
     return res.sendFile(
       INDEX_FILE
@@ -4059,7 +3799,6 @@ app.use(
       error
     );
 
-
     if (
       error instanceof
       multer.MulterError
@@ -4079,7 +3818,6 @@ app.use(
 
       }
 
-
       if (
         error.code ===
         "LIMIT_FILE_COUNT"
@@ -4094,7 +3832,6 @@ app.use(
 
       }
 
-
       return res
         .status(400)
         .json({
@@ -4103,7 +3840,6 @@ app.use(
         });
 
     }
-
 
     if (
       error?.message ===
@@ -4118,7 +3854,6 @@ app.use(
         });
 
     }
-
 
     return res
       .status(500)
@@ -4140,7 +3875,6 @@ async function startServer() {
   try {
 
     await initializeDatabase();
-
 
     app.listen(
       PORT,
@@ -4199,137 +3933,9 @@ async function startServer() {
 
 }
 
-/* ============================================================
-   ADMIN LOGIN API
-   POST /api/admin/login
-    */
 
-const jwt = require("jsonwebtoken");
+/* =========================================================
+   ONLY ONE SERVER START
+========================================================= */
 
-const ADMIN_TOKEN =
-  process.env.ADMIN_TOKEN || "";
-
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  "change-this-secret-in-render";
-
-
-app.post(
-  "/api/admin/login",
-  express.json(),
-  (req, res) => {
-
-    try {
-
-      const token =
-        String(
-          req.body?.token || ""
-        ).trim();
-
-
-      if (!token) {
-
-        return res.status(400).json({
-          success: false,
-          error:
-            "Administrator token is required."
-        });
-
-      }
-
-
-      if (!ADMIN_TOKEN) {
-
-        console.error(
-          "ADMIN_TOKEN is not configured."
-        );
-
-        return res.status(500).json({
-          success: false,
-          error:
-            "Administrator authentication is not configured on the server."
-        });
-
-      }
-
-
-      if (token !== ADMIN_TOKEN) {
-
-        return res.status(401).json({
-          success: false,
-          error:
-            "Invalid administrator token."
-        });
-
-      }
-
-
-      const sessionToken =
-        jwt.sign(
-          {
-            role: "admin",
-            authenticated: true
-          },
-          JWT_SECRET,
-          {
-            expiresIn: "8h"
-          }
-        );
-
-
-      return res.status(200).json({
-
-        success: true,
-
-        token:
-          sessionToken,
-
-        expiresIn:
-          "8h"
-
-      });
-
-
-    } catch (error) {
-
-      console.error(
-        "Admin login error:",
-        error
-      );
-
-      return res.status(500).json({
-        success: false,
-        error:
-          "Administrator login failed."
-      });
-
-    }
-
-  }
-);
-
-
-/* ============================================================
-   API HEALTH CHECK
-   GET /api/health
-   ============================================================ */
-
-app.get(
-  "/api/health",
-  (req, res) => {
-
-    res.status(200).json({
-
-      success: true,
-
-      message:
-        "Application API is running.",
-
-      adminLogin:
-        "/api/admin/login"
-
-    });
-
-  }
-);
 startServer();
