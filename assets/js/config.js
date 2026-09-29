@@ -2,31 +2,17 @@
 
 window.API_BASE_URL =
   "https://application-forms-1-yt65.onrender.com/api";
+
 /*
 ============================================================
 APPLICATION FORM MANAGEMENT SYSTEM
 CONFIGURATION
 ============================================================
-
-File:
-assets/js/config.js
-
-Purpose:
-- Central frontend configuration
-- API endpoint management
-- Environment detection
-- Application settings
-- Upload limits
-- Admin/session settings
-- WRT settings
-- UI configuration
-
-Do not put ADMIN_TOKEN, SESSION_SECRET,
-DATABASE_URL, or AI_API_KEY here.
-
-Those belong ONLY on the backend/server environment.
-============================================================
 */
+
+const API_BASE =
+  window.API_BASE_URL ||
+  "/api";
 
 (function () {
 
