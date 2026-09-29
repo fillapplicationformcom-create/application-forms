@@ -414,13 +414,11 @@
 
 </main>
 
-
 <script>
 "use strict";
 
-
 /* =========================================================
-   API CONFIGURATION
+   ADMIN LOGIN CONFIGURATION
 ========================================================= */
 
 const API_BASE =
@@ -435,46 +433,33 @@ const API_BASE =
 ========================================================= */
 
 const form =
-  document.getElementById(
-    "adminLoginForm"
-  );
+  document.getElementById("adminLoginForm");
 
 const tokenInput =
-  document.getElementById(
-    "adminToken"
-  );
+  document.getElementById("adminToken");
 
 const loginButton =
-  document.getElementById(
-    "loginButton"
-  );
+  document.getElementById("loginButton");
 
 const message =
-  document.getElementById(
-    "message"
-  );
+  document.getElementById("message");
 
 const togglePassword =
-  document.getElementById(
-    "togglePassword"
-  );
+  document.getElementById("togglePassword");
 
 
 /* =========================================================
-   CLEAR OLD SESSION
+   SESSION CHECK
 ========================================================= */
 
-sessionStorage.removeItem(
-  "adminSession"
-);
+const existingSession =
+  sessionStorage.getItem("adminSession");
 
-sessionStorage.removeItem(
-  "adminToken"
-);
+if (existingSession) {
 
-sessionStorage.removeItem(
-  "adminAuthenticated"
-);
+  window.location.replace("/admin.html");
+
+}
 
 
 /* =========================================================
@@ -489,14 +474,17 @@ togglePassword.addEventListener(
       tokenInput.type === "password";
 
     tokenInput.type =
-      hidden
-        ? "text"
-        : "password";
+      hidden ? "text" : "password";
 
     togglePassword.textContent =
+      hidden ? "Hide" : "Show";
+
+    togglePassword.setAttribute(
+      "aria-label",
       hidden
-        ? "Hide"
-        : "Show";
+        ? "Hide token"
+        : "Show token"
+    );
 
   }
 );
@@ -515,7 +503,7 @@ function showMessage(
     text;
 
   message.className =
-    "message " + type;
+    `message ${type}`;
 
 }
 
@@ -537,16 +525,14 @@ function clearMessage() {
 
 form.addEventListener(
   "submit",
-  async event => {
+  async (event) => {
 
     event.preventDefault();
 
     clearMessage();
 
-
     const token =
       tokenInput.value.trim();
-
 
     if (!token) {
 
@@ -572,8 +558,7 @@ form.addEventListener(
 
       const response =
         await fetch(
-          API_BASE +
-          "/api/admin/login",
+          `${API_BASE}/api/admin/login`,
           {
             method: "POST",
 
@@ -585,39 +570,61 @@ form.addEventListener(
                 "application/json"
             },
 
-            body:
-              JSON.stringify({
-                token: token
-              })
+            body: JSON.stringify({
+              token
+            })
           }
         );
 
 
       let data = {};
 
+      const contentType =
+        response.headers.get(
+          "content-type"
+        ) || "";
 
-      try {
+
+      if (
+        contentType.includes(
+          "application/json"
+        )
+      ) {
 
         data =
           await response.json();
 
-      } catch {
+      } else {
 
-        data = {};
+        const text =
+          await response.text();
+
+        throw new Error(
+          text ||
+          `Server returned HTTP ${response.status}`
+        );
 
       }
 
+
+      /* -----------------------------------------------------
+         SERVER ERROR
+      ----------------------------------------------------- */
 
       if (!response.ok) {
 
         throw new Error(
           data.error ||
           data.message ||
-          `Login failed (${response.status}).`
+          `Administrator login failed (${response.status}).`
         );
 
       }
 
+
+      /* -----------------------------------------------------
+         SUCCESS
+      ----------------------------------------------------- */
 
       if (
         !data.success ||
@@ -626,6 +633,7 @@ form.addEventListener(
 
         throw new Error(
           data.error ||
+          data.message ||
           "Server did not return a valid administrator session."
         );
 
@@ -635,11 +643,10 @@ form.addEventListener(
       /*
        * IMPORTANT:
        *
-       * admin.html reads "adminSession".
+       * admin.html expects "adminSession".
        *
-       * Therefore the login page MUST store
-       * the returned server token under exactly
-       * the same key.
+       * Therefore store the server-generated
+       * authentication token under adminSession.
        */
 
       sessionStorage.setItem(
@@ -651,6 +658,16 @@ form.addEventListener(
       sessionStorage.setItem(
         "adminAuthenticated",
         "true"
+      );
+
+
+      /*
+       * Remove the old incompatible key
+       * if it exists.
+       */
+
+      sessionStorage.removeItem(
+        "adminToken"
       );
 
 
@@ -668,9 +685,8 @@ form.addEventListener(
           );
 
         },
-        300
+        400
       );
-
 
     } catch(error) {
 
@@ -680,9 +696,28 @@ form.addEventListener(
       );
 
 
-      showMessage(
+      let errorMessage =
         error.message ||
-        "Unable to connect to the authentication server.",
+        "Unable to connect to the administrator server.";
+
+
+      /*
+       * More useful message for network/CORS/server
+       * failures.
+       */
+
+      if (
+        error instanceof TypeError
+      ) {
+
+        errorMessage =
+          "Unable to connect to the administrator server. Check that the Render backend is running and that /api/admin/login is available.";
+
+      }
+
+
+      showMessage(
+        errorMessage,
         "error"
       );
 
