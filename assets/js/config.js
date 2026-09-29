@@ -1,5 +1,7 @@
 "use strict";
 
+window.API_BASE_URL =
+  "https://application-forms-1-yt65.onrender.com/api";
 /*
 ============================================================
 APPLICATION FORM MANAGEMENT SYSTEM
