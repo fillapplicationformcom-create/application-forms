@@ -730,6 +730,29 @@ form.addEventListener(
 
   }
 );
+<form id="adminLoginForm">
+
+    <input
+        type="password"
+        id="adminToken"
+        name="token"
+        placeholder="Administrator token"
+        autocomplete="current-password"
+        required
+    >
+
+    <button type="submit">
+        Login
+    </button>
+
+    <div
+        id="loginMessage"
+        style="display:none;"
+    ></div>
+
+</form>
+
+<script src="/assets/js/admin-login.js"></script>
 
 </script>
 
