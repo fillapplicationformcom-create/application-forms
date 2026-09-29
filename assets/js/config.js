@@ -7,7 +7,7 @@ CONFIGURATION
 ============================================================
 
 File:
-public/assets/js/config.js
+assets/js/config.js
 
 Purpose:
 - Central frontend configuration
