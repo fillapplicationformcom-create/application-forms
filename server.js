@@ -4199,5 +4199,137 @@ async function startServer() {
 
 }
 
+/* ============================================================
+   ADMIN LOGIN API
+   POST /api/admin/login
+   ============================================================ */
 
+const jwt = require("jsonwebtoken");
+
+const ADMIN_TOKEN =
+  process.env.ADMIN_TOKEN || "";
+
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  "change-this-secret-in-render";
+
+
+app.post(
+  "/api/admin/login",
+  express.json(),
+  (req, res) => {
+
+    try {
+
+      const token =
+        String(
+          req.body?.token || ""
+        ).trim();
+
+
+      if (!token) {
+
+        return res.status(400).json({
+          success: false,
+          error:
+            "Administrator token is required."
+        });
+
+      }
+
+
+      if (!ADMIN_TOKEN) {
+
+        console.error(
+          "ADMIN_TOKEN is not configured."
+        );
+
+        return res.status(500).json({
+          success: false,
+          error:
+            "Administrator authentication is not configured on the server."
+        });
+
+      }
+
+
+      if (token !== ADMIN_TOKEN) {
+
+        return res.status(401).json({
+          success: false,
+          error:
+            "Invalid administrator token."
+        });
+
+      }
+
+
+      const sessionToken =
+        jwt.sign(
+          {
+            role: "admin",
+            authenticated: true
+          },
+          JWT_SECRET,
+          {
+            expiresIn: "8h"
+          }
+        );
+
+
+      return res.status(200).json({
+
+        success: true,
+
+        token:
+          sessionToken,
+
+        expiresIn:
+          "8h"
+
+      });
+
+
+    } catch (error) {
+
+      console.error(
+        "Admin login error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        error:
+          "Administrator login failed."
+      });
+
+    }
+
+  }
+);
+
+
+/* ============================================================
+   API HEALTH CHECK
+   GET /api/health
+   ============================================================ */
+
+app.get(
+  "/api/health",
+  (req, res) => {
+
+    res.status(200).json({
+
+      success: true,
+
+      message:
+        "Application API is running.",
+
+      adminLogin:
+        "/api/admin/login"
+
+    });
+
+  }
+);
 startServer();
