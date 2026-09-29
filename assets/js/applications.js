@@ -7,7 +7,7 @@ APPLICATIONS MODULE
 ============================================================
 
 Path:
-public/assets/js/applications.js
+assets/js/applications.js
 
 Purpose:
 - Submit public applications
