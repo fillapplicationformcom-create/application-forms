@@ -16,7 +16,7 @@ Purpose:
 - Authentication state events
 
 Works with:
-    public/assets/js/admin.js
+    assets/js/admin.js
 
 Backend:
     /api/admin/login
@@ -775,7 +775,7 @@ No credentials are stored in this file.
 
 
   /* ========================================================
-     PUBLIC API
+      API
   ======================================================== */
 
   window.ApplicationAuth = {
