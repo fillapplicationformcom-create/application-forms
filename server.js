@@ -147,20 +147,22 @@ app.use(
   cors({
     origin: (origin, callback) => {
 
-      // Same-origin requests and server/API requests
+      // Requests without an Origin header
       if (!origin) {
         return callback(null, true);
       }
 
-      // Allow the configured origins
-      if (allowedOrigins.includes(origin)) {
+      // Your Render application
+      if (
+        origin ===
+        "https://application-forms-1-yt65.onrender.com"
+      ) {
         return callback(null, true);
       }
 
-      // Allow this Render application
+      // Any additional origins configured in Render
       if (
-        origin ===
-        "https://application-forms-3br1.onrender.com"
+        allowedOrigins.includes(origin)
       ) {
         return callback(null, true);
       }
@@ -170,8 +172,15 @@ app.use(
         return callback(null, true);
       }
 
+      console.warn(
+        "Blocked CORS origin:",
+        origin
+      );
+
       return callback(
-        new Error("Origin not allowed by CORS.")
+        new Error(
+          "Origin not allowed by CORS."
+        )
       );
     },
 
