@@ -3,6 +3,7 @@
 /*
 ============================================================
 APPLICATION FORM MANAGEMENT SYSTEM
+SERVER.JS
 ============================================================
 
 Node.js 20+
@@ -11,51 +12,20 @@ PostgreSQL
 Multer
 JWT
 PDFKit
-CORS
-Rate Limiting
-Audit Logging
-AI API Integration
+WRT / explicit authorization
+Audit logging
+AI API integration
+
+FRONTEND:
+index.html is in project root.
 
 API:
-  /api/health
+Same-origin /api
 
-Public:
-  POST /api/applications
-  GET  /api/access/:requestId
-  POST /api/access/:requestId/approve
-  POST /api/access/:requestId/deny
-
-Admin:
-  POST  /api/admin/login
-  POST  /api/admin/logout
-  GET   /api/admin/applications
-  GET   /api/admin/applications/:id
-  PATCH /api/admin/applications/:id/status
-  GET   /api/admin/applications/:id/files
-  GET   /api/admin/files/:fileId
-  GET   /api/admin/applications/:id/pdf
-
-  POST  /api/admin/applications/:id/access-request
-  GET   /api/admin/applications/:id/access-status
-
-  PATCH /api/admin/access-requests/:requestId/approve
-  PATCH /api/admin/access-requests/:requestId/deny
-
-  GET   /api/admin/audit-logs
-
-  POST  /api/admin/ai/analyze
-
-Environment:
-  DATABASE_URL
-  ADMIN_TOKEN
-  SESSION_SECRET
-  AI_API_KEY
-  AI_API_URL
-  AI_MODEL
-  FRONTEND_ORIGIN
-  PORT
-  NODE_ENV
-
+IMPORTANT:
+Do not put ADMIN_TOKEN, SESSION_SECRET or AI_API_KEY
+inside frontend JavaScript.
+They belong only in Render Environment Variables.
 ============================================================
 */
 
@@ -104,12 +74,54 @@ const AI_MODEL =
   process.env.AI_MODEL ||
   "gpt-4o-mini";
 
-const FRONTEND_ORIGIN =
-  process.env.FRONTEND_ORIGIN ||
-  "https://application-forms-1-yt65.onrender.com";
+
+console.log(
+  "----------------------------------------------"
+);
+
+console.log(
+  "Application Form Management System"
+);
+
+console.log(
+  `Environment: ${NODE_ENV}`
+);
+
+console.log(
+  `Port: ${PORT}`
+);
+
+console.log(
+  `Database configured: ${Boolean(
+    DATABASE_URL
+  )}`
+);
+
+console.log(
+  `Admin token configured: ${Boolean(
+    ADMIN_TOKEN
+  )}`
+);
+
+console.log(
+  `Session secret configured: ${Boolean(
+    SESSION_SECRET
+  )}`
+);
+
+console.log(
+  `AI configured: ${Boolean(
+    AI_API_KEY
+  )}`
+);
+
+console.log(
+  "----------------------------------------------"
+);
+
 
 /* =========================================================
-   STARTUP WARNINGS
+   REQUIRED ENVIRONMENT CHECKS
 ========================================================= */
 
 if (!DATABASE_URL) {
@@ -130,34 +142,29 @@ if (!SESSION_SECRET) {
   );
 }
 
-if (!AI_API_KEY) {
-  console.warn(
-    "INFO: AI_API_KEY is not configured. AI analysis will be disabled."
-  );
-}
 
 /* =========================================================
    DIRECTORIES
 ========================================================= */
 
-const PROJECT_DIR =
+const ROOT_DIR =
   __dirname;
 
 const INDEX_FILE =
   path.join(
-    PROJECT_DIR,
+    ROOT_DIR,
     "index.html"
   );
 
 const DATA_DIR =
   path.join(
-    PROJECT_DIR,
+    ROOT_DIR,
     "data"
   );
 
 const UPLOADS_DIR =
   path.join(
-    PROJECT_DIR,
+    ROOT_DIR,
     "uploads"
   );
 
@@ -179,50 +186,60 @@ const RESUMES_DIR =
     "resumes"
   );
 
+
 [
   DATA_DIR,
   UPLOADS_DIR,
   PHOTOS_DIR,
   DOCUMENTS_DIR,
   RESUMES_DIR
-].forEach((directory) => {
-  fs.mkdirSync(
-    directory,
-    {
-      recursive: true
-    }
-  );
-});
+].forEach(
+  (directory) => {
+
+    fs.mkdirSync(
+      directory,
+      {
+        recursive: true
+      }
+    );
+
+  }
+);
+
 
 /* =========================================================
    DATABASE
 ========================================================= */
 
-const pool = DATABASE_URL
-  ? new Pool({
-      connectionString:
-        DATABASE_URL,
+const pool =
+  DATABASE_URL
+    ? new Pool({
 
-      ssl:
-        NODE_ENV === "production"
-          ? {
-              rejectUnauthorized:
-                false
-            }
-          : false,
+        connectionString:
+          DATABASE_URL,
 
-      max: 10,
+        ssl:
+          NODE_ENV === "production"
+            ? {
+                rejectUnauthorized:
+                  false
+              }
+            : false,
 
-      idleTimeoutMillis:
-        30000,
+        max: 10,
 
-      connectionTimeoutMillis:
-        10000
-    })
-  : null;
+        idleTimeoutMillis:
+          30000,
+
+        connectionTimeoutMillis:
+          10000
+
+      })
+    : null;
+
 
 /* =========================================================
-   EXPRESS
+   EXPRESS BASIC SETTINGS
 ========================================================= */
 
 app.disable(
@@ -230,8 +247,7 @@ app.disable(
 );
 
 if (
-  NODE_ENV ===
-  "production"
+  NODE_ENV === "production"
 ) {
   app.set(
     "trust proxy",
@@ -239,75 +255,71 @@ if (
   );
 }
 
+
 /* =========================================================
    CORS
 ========================================================= */
 
-const allowedOrigins =
-  new Set(
-    [
-      FRONTEND_ORIGIN,
+/*
+The application normally uses SAME-ORIGIN requests.
 
-      "https://application-forms-1-yt65.onrender.com"
-    ].filter(Boolean)
-  );
+The Render frontend is also explicitly allowed.
+*/
+
+const allowedOrigins = new Set([
+  "https://application-forms-1-yt65.onrender.com"
+]);
+
 
 app.use(
   cors({
-    origin: function (
-      origin,
-      callback
-    ) {
 
-      /*
-       * Requests without Origin include:
-       * curl
-       * Render health checks
-       * server-to-server requests
-       */
-
-      if (!origin) {
-        return callback(
-          null,
-          true
-        );
-      }
-
-      if (
-        allowedOrigins.has(
-          origin
-        )
+    origin:
+      function (
+        origin,
+        callback
       ) {
+
+        /*
+        Browser requests from the same origin
+        normally do not need CORS handling.
+        */
+
+        if (!origin) {
+          return callback(
+            null,
+            true
+          );
+        }
+
+        if (
+          allowedOrigins.has(
+            origin
+          )
+        ) {
+          return callback(
+            null,
+            true
+          );
+        }
+
+        /*
+        Do not crash the application because
+        of an unknown Origin.
+        */
+
         return callback(
           null,
-          true
+          false
         );
-      }
 
-      return callback(
-        new Error(
-          "Origin not allowed by CORS"
-        )
-      );
-    },
+      },
 
-    credentials: true,
+    credentials: true
 
-    methods: [
-      "GET",
-      "POST",
-      "PATCH",
-      "PUT",
-      "DELETE",
-      "OPTIONS"
-    ],
-
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization"
-    ]
   })
 );
+
 
 /* =========================================================
    BODY PARSERS
@@ -325,6 +337,7 @@ app.use(
     limit: "10mb"
   })
 );
+
 
 /* =========================================================
    SECURITY HEADERS
@@ -358,8 +371,10 @@ app.use(
     );
 
     next();
+
   }
 );
+
 
 /* =========================================================
    RATE LIMITING
@@ -367,6 +382,7 @@ app.use(
 
 const loginLimiter =
   rateLimit({
+
     windowMs:
       15 * 60 * 1000,
 
@@ -382,10 +398,13 @@ const loginLimiter =
       error:
         "Too many login attempts. Please try again later."
     }
+
   });
+
 
 const applicationLimiter =
   rateLimit({
+
     windowMs:
       15 * 60 * 1000,
 
@@ -401,10 +420,13 @@ const applicationLimiter =
       error:
         "Too many application submissions. Please try again later."
     }
+
   });
+
 
 const accessLimiter =
   rateLimit({
+
     windowMs:
       15 * 60 * 1000,
 
@@ -420,7 +442,9 @@ const accessLimiter =
       error:
         "Too many authorization requests."
     }
+
   });
+
 
 /* =========================================================
    MULTER
@@ -429,81 +453,97 @@ const accessLimiter =
 const storage =
   multer.diskStorage({
 
-    destination: (
-      req,
-      file,
-      callback
-    ) => {
+    destination:
+      (
+        req,
+        file,
+        callback
+      ) => {
 
-      if (
-        file.fieldname ===
-          "photo" ||
-        file.fieldname ===
-          "photoFile"
-      ) {
+        if (
+          file.fieldname ===
+            "photo" ||
+          file.fieldname ===
+            "photoFile"
+        ) {
+
+          return callback(
+            null,
+            PHOTOS_DIR
+          );
+
+        }
+
+
+        if (
+          file.fieldname ===
+            "resume" ||
+          file.fieldname ===
+            "resumeFile"
+        ) {
+
+          return callback(
+            null,
+            RESUMES_DIR
+          );
+
+        }
+
 
         return callback(
           null,
-          PHOTOS_DIR
+          DOCUMENTS_DIR
         );
-      }
 
-      if (
-        file.fieldname ===
-          "resume" ||
-        file.fieldname ===
-          "resumeFile"
-      ) {
+      },
 
-        return callback(
-          null,
-          RESUMES_DIR
-        );
-      }
 
-      return callback(
-        null,
-        DOCUMENTS_DIR
-      );
-    },
+    filename:
+      (
+        req,
+        file,
+        callback
+      ) => {
 
-    filename: (
-      req,
-      file,
-      callback
-    ) => {
-
-      const extension =
-        path
-          .extname(
+        const extension =
+          path.extname(
             file.originalname
-          )
-          .toLowerCase();
+          ).toLowerCase();
 
-      const randomName =
-        crypto
-          .randomBytes(18)
-          .toString("hex");
 
-      const filename =
-        `${Date.now()}-${randomName}${extension}`;
+        const randomName =
+          crypto
+            .randomBytes(18)
+            .toString("hex");
 
-      callback(
-        null,
-        filename
-      );
-    }
+
+        callback(
+          null,
+          `${Date.now()}-${randomName}${extension}`
+        );
+
+      }
+
   });
+
 
 const allowedMimeTypes =
   new Set([
+
     "image/jpeg",
+
     "image/png",
+
     "image/webp",
+
     "application/pdf",
+
     "application/msword",
+
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
   ]);
+
 
 const upload =
   multer({
@@ -511,40 +551,48 @@ const upload =
     storage,
 
     limits: {
+
       fileSize:
         10 * 1024 * 1024,
 
       files: 20
+
     },
 
-    fileFilter: (
-      req,
-      file,
-      callback
-    ) => {
+    fileFilter:
+      (
+        req,
+        file,
+        callback
+      ) => {
 
-      if (
-        allowedMimeTypes.has(
-          file.mimetype
-        )
-      ) {
+        if (
+          allowedMimeTypes.has(
+            file.mimetype
+          )
+        ) {
+
+          return callback(
+            null,
+            true
+          );
+
+        }
 
         return callback(
-          null,
-          true
+          new Error(
+            "Unsupported file type."
+          )
         );
+
       }
 
-      return callback(
-        new Error(
-          "Unsupported file type."
-        )
-      );
-    }
   });
+
 
 const applicationUpload =
   upload.fields([
+
     {
       name: "photo",
       maxCount: 1
@@ -574,7 +622,9 @@ const applicationUpload =
       name: "files",
       maxCount: 15
     }
+
   ]);
+
 
 /* =========================================================
    UTILITY FUNCTIONS
@@ -587,16 +637,20 @@ function generateApplicationId() {
       .toString(36)
       .toUpperCase();
 
+
   const random =
     crypto
       .randomBytes(5)
       .toString("hex")
       .toUpperCase();
 
+
   return (
     `APP-${timestamp}-${random}`
   );
+
 }
+
 
 function safeJsonParse(
   value
@@ -608,14 +662,21 @@ function safeJsonParse(
   ) {
 
     return (
-      value || {}
+      value &&
+      typeof value ===
+        "object"
+        ? value
+        : {}
     );
+
   }
+
 
   try {
 
     const parsed =
       JSON.parse(value);
+
 
     if (
       parsed &&
@@ -624,15 +685,20 @@ function safeJsonParse(
     ) {
 
       return parsed;
+
     }
+
 
     return {};
 
   } catch {
 
     return {};
+
   }
+
 }
+
 
 function getUploadedFiles(
   files
@@ -642,42 +708,56 @@ function getUploadedFiles(
     return [];
   }
 
-  return Object
-    .values(files)
+
+  return Object.values(
+    files
+  )
     .flat()
-    .map((file) => {
+    .map(
+      (
+        file
+      ) => {
 
-      let category =
-        "document";
+        let category =
+          "document";
 
-      if (
-        file.fieldname ===
-          "photo" ||
-        file.fieldname ===
-          "photoFile"
-      ) {
 
-        category =
-          "photo";
+        if (
+          file.fieldname ===
+            "photo" ||
+          file.fieldname ===
+            "photoFile"
+        ) {
+
+          category =
+            "photo";
+
+        }
+
+
+        if (
+          file.fieldname ===
+            "resume" ||
+          file.fieldname ===
+            "resumeFile"
+        ) {
+
+          category =
+            "resume";
+
+        }
+
+
+        return {
+          file,
+          category
+        };
+
       }
+    );
 
-      if (
-        file.fieldname ===
-          "resume" ||
-        file.fieldname ===
-          "resumeFile"
-      ) {
-
-        category =
-          "resume";
-      }
-
-      return {
-        file,
-        category
-      };
-    });
 }
+
 
 function cleanupUploadedFiles(
   files
@@ -686,6 +766,7 @@ function cleanupUploadedFiles(
   if (!files) {
     return;
   }
+
 
   for (
     const file of
@@ -707,6 +788,7 @@ function cleanupUploadedFiles(
         fs.unlinkSync(
           file.path
         );
+
       }
 
     } catch (
@@ -717,9 +799,13 @@ function cleanupUploadedFiles(
         "File cleanup error:",
         error.message
       );
+
     }
+
   }
+
 }
+
 
 function sanitizeFilename(
   filename
@@ -732,7 +818,9 @@ function sanitizeFilename(
       /[^a-zA-Z0-9._-]/g,
       "_"
     );
+
 }
+
 
 function isInsideDirectory(
   filePath,
@@ -749,35 +837,24 @@ function isInsideDirectory(
       directory
     );
 
+
   const relative =
     path.relative(
       resolvedDirectory,
       resolvedFile
     );
 
+
   return (
     relative !== "" &&
-    !relative.startsWith(
-      ".."
-    ) &&
+    !relative.startsWith("..") &&
     !path.isAbsolute(
       relative
     )
   );
+
 }
 
-function getClientIp(
-  req
-) {
-
-  return (
-    req.headers[
-      "x-forwarded-for"
-    ] ||
-    req.socket?.remoteAddress ||
-    ""
-  );
-}
 
 /* =========================================================
    AUTHENTICATION
@@ -790,7 +867,9 @@ function createAdminSession() {
     throw new Error(
       "SESSION_SECRET is not configured."
     );
+
   }
+
 
   return jwt.sign(
     {
@@ -800,10 +879,14 @@ function createAdminSession() {
     SESSION_SECRET,
 
     {
-      expiresIn: "8h"
+      expiresIn:
+        "8h"
     }
+
   );
+
 }
+
 
 function requireAdmin(
   req,
@@ -812,8 +895,9 @@ function requireAdmin(
 ) {
 
   const authorization =
-    req.headers
-      .authorization || "";
+    req.headers.authorization ||
+    "";
+
 
   if (
     !authorization.startsWith(
@@ -827,12 +911,15 @@ function requireAdmin(
         error:
           "Administrator authentication required."
       });
+
   }
+
 
   const token =
     authorization.substring(
       7
-    ).trim();
+    );
+
 
   if (!token) {
 
@@ -842,7 +929,9 @@ function requireAdmin(
         error:
           "Administrator authentication required."
       });
+
   }
+
 
   try {
 
@@ -851,7 +940,9 @@ function requireAdmin(
       throw new Error(
         "SESSION_SECRET missing."
       );
+
     }
+
 
     const decoded =
       jwt.verify(
@@ -859,10 +950,10 @@ function requireAdmin(
         SESSION_SECRET
       );
 
+
     if (
-      !decoded ||
       decoded.role !==
-        "admin"
+      "admin"
     ) {
 
       return res
@@ -871,10 +962,13 @@ function requireAdmin(
           error:
             "Administrator access required."
         });
+
     }
+
 
     req.admin =
       decoded;
+
 
     return next();
 
@@ -888,11 +982,14 @@ function requireAdmin(
         error:
           "Administrator session is invalid or expired."
       });
+
   }
+
 }
 
+
 /* =========================================================
-   AUDIT LOGGING
+   AUDIT LOG
 ========================================================= */
 
 async function writeAuditLog(
@@ -904,6 +1001,7 @@ async function writeAuditLog(
   if (!pool) {
     return;
   }
+
 
   try {
 
@@ -937,8 +1035,11 @@ async function writeAuditLog(
       "Audit log error:",
       error.message
     );
+
   }
+
 }
+
 
 /* =========================================================
    DATABASE INITIALIZATION
@@ -953,13 +1054,12 @@ async function initializeDatabase() {
     );
 
     return;
+
   }
 
-  /*
-   * Applications
-   */
 
-  await pool.query(`
+  await pool.query(
+    `
     CREATE TABLE IF NOT EXISTS applications (
       id UUID PRIMARY KEY,
 
@@ -978,39 +1078,12 @@ async function initializeDatabase() {
       updated_at TIMESTAMPTZ
         NOT NULL DEFAULT NOW()
     );
-  `);
+    `
+  );
 
-  /*
-   * Make existing installations compatible
-   * if the table was created by an older version.
-   */
 
-  await pool.query(`
-    ALTER TABLE applications
-    ADD COLUMN IF NOT EXISTS
-    updated_at TIMESTAMPTZ
-    NOT NULL DEFAULT NOW();
-  `);
-
-  await pool.query(`
-    ALTER TABLE applications
-    ADD COLUMN IF NOT EXISTS
-    applicant_data JSONB
-    NOT NULL DEFAULT '{}'::jsonb;
-  `);
-
-  await pool.query(`
-    ALTER TABLE applications
-    ADD COLUMN IF NOT EXISTS
-    status VARCHAR(50)
-    NOT NULL DEFAULT 'Submitted';
-  `);
-
-  /*
-   * Application files
-   */
-
-  await pool.query(`
+  await pool.query(
+    `
     CREATE TABLE IF NOT EXISTS application_files (
       id UUID PRIMARY KEY,
 
@@ -1033,13 +1106,12 @@ async function initializeDatabase() {
       created_at TIMESTAMPTZ
         NOT NULL DEFAULT NOW()
     );
-  `);
+    `
+  );
 
-  /*
-   * Access requests
-   */
 
-  await pool.query(`
+  await pool.query(
+    `
     CREATE TABLE IF NOT EXISTS access_requests (
       id UUID PRIMARY KEY,
 
@@ -1060,13 +1132,12 @@ async function initializeDatabase() {
 
       expires_at TIMESTAMPTZ
     );
-  `);
+    `
+  );
 
-  /*
-   * Audit logs
-   */
 
-  await pool.query(`
+  await pool.query(
+    `
     CREATE TABLE IF NOT EXISTS audit_logs (
       id UUID PRIMARY KEY,
 
@@ -1081,52 +1152,52 @@ async function initializeDatabase() {
       created_at TIMESTAMPTZ
         NOT NULL DEFAULT NOW()
     );
-  `);
+    `
+  );
 
-  /*
-   * Indexes
-   */
 
-  await pool.query(`
+  await pool.query(
+    `
     CREATE INDEX IF NOT EXISTS
     idx_applications_created_at
     ON applications(created_at DESC);
-  `);
+    `
+  );
 
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS
-    idx_applications_application_id
-    ON applications(application_id);
-  `);
 
-  await pool.query(`
+  await pool.query(
+    `
     CREATE INDEX IF NOT EXISTS
     idx_application_files_application
     ON application_files(application_id);
-  `);
+    `
+  );
 
-  await pool.query(`
+
+  await pool.query(
+    `
     CREATE INDEX IF NOT EXISTS
     idx_access_requests_application
     ON access_requests(application_id);
-  `);
+    `
+  );
 
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS
-    idx_access_requests_status
-    ON access_requests(status);
-  `);
 
-  await pool.query(`
+  await pool.query(
+    `
     CREATE INDEX IF NOT EXISTS
     idx_audit_logs_created_at
     ON audit_logs(created_at DESC);
-  `);
+    `
+  );
+
 
   console.log(
     "PostgreSQL database initialized successfully."
   );
+
 }
+
 
 /* =========================================================
    HEALTH CHECK
@@ -1134,6 +1205,7 @@ async function initializeDatabase() {
 
 app.get(
   "/api/health",
+
   async (
     req,
     res
@@ -1141,6 +1213,7 @@ app.get(
 
     let database =
       "unavailable";
+
 
     if (pool) {
 
@@ -1157,15 +1230,26 @@ app.get(
         error
       ) {
 
+        console.error(
+          "Database health error:",
+          error.message
+        );
+
         database =
           "error";
+
       }
+
     }
 
-    return res.json({
-      success: true,
 
-      status: "ok",
+    return res.json({
+
+      success:
+        true,
+
+      status:
+        "ok",
 
       service:
         "application-form",
@@ -1181,10 +1265,14 @@ app.get(
         ),
 
       timestamp:
-        new Date().toISOString()
+        new Date()
+          .toISOString()
+
     });
+
   }
 );
+
 
 /* =========================================================
    ADMIN LOGIN
@@ -1192,6 +1280,7 @@ app.get(
 
 app.post(
   "/api/admin/login",
+
   loginLimiter,
 
   async (
@@ -1209,23 +1298,16 @@ app.post(
             error:
               "ADMIN_TOKEN is not configured."
           });
+
       }
 
-      if (!SESSION_SECRET) {
-
-        return res
-          .status(500)
-          .json({
-            error:
-              "SESSION_SECRET is not configured."
-          });
-      }
 
       const suppliedToken =
         typeof req.body?.token ===
-        "string"
+          "string"
           ? req.body.token.trim()
           : "";
+
 
       if (!suppliedToken) {
 
@@ -1235,7 +1317,9 @@ app.post(
             error:
               "Administrator token is required."
           });
+
       }
+
 
       const supplied =
         Buffer.from(
@@ -1243,37 +1327,29 @@ app.post(
           "utf8"
         );
 
+
       const expected =
         Buffer.from(
           ADMIN_TOKEN,
           "utf8"
         );
 
-      let valid =
+
+      const valid =
         supplied.length ===
-        expected.length;
+          expected.length &&
+        crypto.timingSafeEqual(
+          supplied,
+          expected
+        );
 
-      if (valid) {
-
-        valid =
-          crypto.timingSafeEqual(
-            supplied,
-            expected
-          );
-      }
 
       if (!valid) {
 
         await writeAuditLog(
-          "admin_login_failed",
-          null,
-          {
-            ip:
-              getClientIp(
-                req
-              )
-          }
+          "admin_login_failed"
         );
+
 
         return res
           .status(401)
@@ -1281,30 +1357,30 @@ app.post(
             error:
               "Invalid administrator token."
           });
+
       }
+
 
       const sessionToken =
         createAdminSession();
 
+
       await writeAuditLog(
-        "admin_login_success",
-        null,
-        {
-          ip:
-            getClientIp(
-              req
-            )
-        }
+        "admin_login_success"
       );
 
+
       return res.json({
-        success: true,
+
+        success:
+          true,
 
         token:
           sessionToken,
 
         expiresIn:
           "8h"
+
       });
 
     } catch (
@@ -1316,15 +1392,19 @@ app.post(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to authenticate administrator."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN LOGOUT
@@ -1332,6 +1412,7 @@ app.post(
 
 app.post(
   "/api/admin/logout",
+
   requireAdmin,
 
   async (
@@ -1343,11 +1424,15 @@ app.post(
       "admin_logout"
     );
 
+
     return res.json({
-      success: true
+      success:
+        true
     });
+
   }
 );
+
 
 /* =========================================================
    SUBMIT APPLICATION
@@ -1355,7 +1440,9 @@ app.post(
 
 app.post(
   "/api/applications",
+
   applicationLimiter,
+
   applicationUpload,
 
   async (
@@ -1369,16 +1456,20 @@ app.post(
         req.files
       );
 
+
       return res
         .status(503)
         .json({
           error:
             "Database is not configured."
         });
+
     }
+
 
     const client =
       await pool.connect();
+
 
     try {
 
@@ -1389,33 +1480,42 @@ app.post(
           "{}"
         );
 
-      const ordinaryFields = {
-        ...req.body
-      };
+
+      const ordinaryFields =
+        {
+          ...req.body
+        };
+
 
       delete ordinaryFields.data;
 
       delete ordinaryFields.applicationData;
 
-      const combinedData = {
-        ...ordinaryFields,
 
-        ...(applicantData &&
-        typeof applicantData ===
-          "object"
-          ? applicantData
-          : {})
-      };
+      const combinedData =
+        {
+          ...ordinaryFields,
+
+          ...(applicantData &&
+          typeof applicantData ===
+            "object"
+            ? applicantData
+            : {})
+        };
+
 
       const applicationUUID =
         crypto.randomUUID();
 
+
       const applicationId =
         generateApplicationId();
+
 
       await client.query(
         "BEGIN"
       );
+
 
       await client.query(
         `
@@ -1438,13 +1538,16 @@ app.post(
         ]
       );
 
+
       const uploaded =
         getUploadedFiles(
           req.files
         );
 
+
       const savedFiles =
         [];
+
 
       for (
         const item of
@@ -1454,14 +1557,17 @@ app.post(
         const file =
           item.file;
 
+
         const relativePath =
           path.relative(
-            PROJECT_DIR,
+            ROOT_DIR,
             file.path
           );
 
+
         const fileUUID =
           crypto.randomUUID();
+
 
         await client.query(
           `
@@ -1490,24 +1596,19 @@ app.post(
           `,
           [
             fileUUID,
-
             applicationUUID,
-
             file.originalname,
-
             file.filename,
-
             relativePath,
-
             file.mimetype,
-
             item.category,
-
             file.size
           ]
         );
 
+
         savedFiles.push({
+
           id:
             fileUUID,
 
@@ -1522,12 +1623,16 @@ app.post(
 
           size:
             file.size
+
         });
+
       }
+
 
       await client.query(
         "COMMIT"
       );
+
 
       await writeAuditLog(
         "application_submitted",
@@ -1537,11 +1642,13 @@ app.post(
         }
       );
 
+
       return res
         .status(201)
         .json({
 
-          success: true,
+          success:
+            true,
 
           applicationId,
 
@@ -1556,6 +1663,7 @@ app.post(
 
           message:
             "Application submitted successfully."
+
         });
 
     } catch (
@@ -1570,14 +1678,17 @@ app.post(
 
       } catch {}
 
+
       cleanupUploadedFiles(
         req.files
       );
+
 
       console.error(
         "Application submission error:",
         error
       );
+
 
       return res
         .status(500)
@@ -1589,9 +1700,12 @@ app.post(
     } finally {
 
       client.release();
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — LIST APPLICATIONS
@@ -1599,6 +1713,7 @@ app.post(
 
 app.get(
   "/api/admin/applications",
+
   requireAdmin,
 
   async (
@@ -1616,7 +1731,9 @@ app.get(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -1633,11 +1750,15 @@ app.get(
           `
         );
 
+
       return res.json({
-        success: true,
+
+        success:
+          true,
 
         applications:
           result.rows
+
       });
 
     } catch (
@@ -1649,15 +1770,19 @@ app.get(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to retrieve applications."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — GET APPLICATION
@@ -1665,6 +1790,7 @@ app.get(
 
 app.get(
   "/api/admin/applications/:id",
+
   requireAdmin,
 
   async (
@@ -1682,7 +1808,9 @@ app.get(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -1705,6 +1833,7 @@ app.get(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -1716,10 +1845,13 @@ app.get(
             error:
               "Application not found."
           });
+
       }
+
 
       const application =
         result.rows[0];
+
 
       const files =
         await pool.query(
@@ -1740,6 +1872,7 @@ app.get(
           ]
         );
 
+
       await writeAuditLog(
         "application_viewed",
         application.id,
@@ -1749,13 +1882,17 @@ app.get(
         }
       );
 
+
       return res.json({
-        success: true,
+
+        success:
+          true,
 
         application,
 
         files:
           files.rows
+
       });
 
     } catch (
@@ -1767,15 +1904,19 @@ app.get(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to retrieve application."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — UPDATE STATUS
@@ -1783,6 +1924,7 @@ app.get(
 
 app.patch(
   "/api/admin/applications/:id/status",
+
   requireAdmin,
 
   async (
@@ -1800,24 +1942,36 @@ app.patch(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const allowedStatuses =
         [
+
           "Submitted",
+
           "Under Review",
+
           "Documents Required",
+
           "Verified",
+
           "Approved",
+
           "Rejected",
+
           "Withdrawn"
+
         ];
+
 
       const status =
         String(
           req.body?.status ||
           ""
         ).trim();
+
 
       if (
         !allowedStatuses.includes(
@@ -1831,7 +1985,9 @@ app.patch(
             error:
               "Invalid application status."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -1855,6 +2011,7 @@ app.patch(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -1866,10 +2023,13 @@ app.patch(
             error:
               "Application not found."
           });
+
       }
+
 
       const application =
         result.rows[0];
+
 
       await writeAuditLog(
         "application_status_changed",
@@ -1879,10 +2039,14 @@ app.patch(
         }
       );
 
+
       return res.json({
-        success: true,
+
+        success:
+          true,
 
         application
+
       });
 
     } catch (
@@ -1894,15 +2058,19 @@ app.patch(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to update application status."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — LIST FILES
@@ -1910,6 +2078,7 @@ app.patch(
 
 app.get(
   "/api/admin/applications/:id/files",
+
   requireAdmin,
 
   async (
@@ -1927,7 +2096,9 @@ app.get(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -1952,11 +2123,15 @@ app.get(
           ]
         );
 
+
       return res.json({
-        success: true,
+
+        success:
+          true,
 
         files:
           result.rows
+
       });
 
     } catch (
@@ -1968,15 +2143,19 @@ app.get(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to retrieve files."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — VIEW FILE
@@ -1984,6 +2163,7 @@ app.get(
 
 app.get(
   "/api/admin/files/:fileId",
+
   requireAdmin,
 
   async (
@@ -2001,7 +2181,9 @@ app.get(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -2021,6 +2203,7 @@ app.get(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -2032,16 +2215,20 @@ app.get(
             error:
               "File not found."
           });
+
       }
+
 
       const file =
         result.rows[0];
 
+
       const absolutePath =
         path.resolve(
-          PROJECT_DIR,
+          ROOT_DIR,
           file.relative_path
         );
+
 
       if (
         !isInsideDirectory(
@@ -2056,7 +2243,9 @@ app.get(
             error:
               "Invalid file path."
           });
+
       }
+
 
       if (
         !fs.existsSync(
@@ -2070,7 +2259,9 @@ app.get(
             error:
               "Stored file no longer exists."
           });
+
       }
+
 
       res.setHeader(
         "Content-Type",
@@ -2078,12 +2269,14 @@ app.get(
           "application/octet-stream"
       );
 
+
       res.setHeader(
         "Content-Disposition",
         `inline; filename="${sanitizeFilename(
           file.original_name
         )}"`
       );
+
 
       await writeAuditLog(
         "file_accessed",
@@ -2093,6 +2286,7 @@ app.get(
             file.id
         }
       );
+
 
       return res.sendFile(
         absolutePath
@@ -2107,15 +2301,19 @@ app.get(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to open file."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — GENERATE PDF
@@ -2123,6 +2321,7 @@ app.get(
 
 app.get(
   "/api/admin/applications/:id/pdf",
+
   requireAdmin,
 
   async (
@@ -2140,7 +2339,9 @@ app.get(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -2163,6 +2364,7 @@ app.get(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -2174,10 +2376,13 @@ app.get(
             error:
               "Application not found."
           });
+
       }
+
 
       const application =
         result.rows[0];
+
 
       const files =
         await pool.query(
@@ -2196,16 +2401,24 @@ app.get(
           ]
         );
 
+
       const doc =
         new PDFDocument({
-          margin: 50,
-          size: "A4"
+
+          margin:
+            50,
+
+          size:
+            "A4"
+
         });
+
 
       res.setHeader(
         "Content-Type",
         "application/pdf"
       );
+
 
       res.setHeader(
         "Content-Disposition",
@@ -2214,7 +2427,11 @@ app.get(
         )}.pdf"`
       );
 
-      doc.pipe(res);
+
+      doc.pipe(
+        res
+      );
+
 
       doc
         .fontSize(20)
@@ -2226,7 +2443,9 @@ app.get(
           }
         );
 
+
       doc.moveDown();
+
 
       doc
         .fontSize(11)
@@ -2234,9 +2453,11 @@ app.get(
           `Application ID: ${application.application_id}`
         );
 
+
       doc.text(
         `Status: ${application.status}`
       );
+
 
       doc.text(
         `Submitted: ${new Date(
@@ -2246,7 +2467,9 @@ app.get(
         )}`
       );
 
+
       doc.moveDown();
+
 
       doc
         .fontSize(14)
@@ -2254,17 +2477,21 @@ app.get(
           "Applicant Information"
         );
 
+
       doc.moveDown(
         0.5
       );
+
 
       const applicantData =
         application.applicant_data ||
         {};
 
+
       doc.fontSize(
         10
       );
+
 
       for (
         const [
@@ -2278,30 +2505,34 @@ app.get(
         let printable =
           "";
 
+
         if (
-          value !==
-            null &&
-          value !==
-            undefined
+          value !== null &&
+          value !== undefined
         ) {
 
           printable =
             typeof value ===
-            "object"
+              "object"
               ? JSON.stringify(
                   value
                 )
               : String(
                   value
                 );
+
         }
+
 
         doc.text(
           `${key}: ${printable}`
         );
+
       }
 
+
       doc.moveDown();
+
 
       doc
         .fontSize(14)
@@ -2309,13 +2540,16 @@ app.get(
           "Uploaded Files"
         );
 
+
       doc.moveDown(
         0.5
       );
 
+
       doc.fontSize(
         10
       );
+
 
       if (
         files.rows.length ===
@@ -2336,10 +2570,14 @@ app.get(
           doc.text(
             `${file.category}: ${file.original_name}`
           );
+
         }
+
       }
 
+
       doc.moveDown();
+
 
       doc
         .fontSize(8)
@@ -2351,7 +2589,9 @@ app.get(
           }
         );
 
+
       doc.end();
+
 
       await writeAuditLog(
         "application_pdf_generated",
@@ -2371,6 +2611,7 @@ app.get(
         error
       );
 
+
       if (
         !res.headersSent
       ) {
@@ -2381,10 +2622,14 @@ app.get(
             error:
               "Unable to generate application PDF."
           });
+
       }
+
     }
+
   }
 );
+
 
 /* =========================================================
    WRT — CREATE ACCESS REQUEST
@@ -2392,7 +2637,10 @@ app.get(
 
 app.post(
   "/api/admin/applications/:id/access-request",
+
   requireAdmin,
+
+  accessLimiter,
 
   async (
     req,
@@ -2409,13 +2657,16 @@ app.post(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const type =
         String(
           req.body?.type ||
           "wrt"
         ).trim();
+
 
       const application =
         await pool.query(
@@ -2434,6 +2685,7 @@ app.post(
           ]
         );
 
+
       if (
         application.rows.length ===
         0
@@ -2445,14 +2697,13 @@ app.post(
             error:
               "Application not found."
           });
+
       }
+
 
       const row =
         application.rows[0];
 
-      /*
-       * Expire old pending requests.
-       */
 
       await pool.query(
         `
@@ -2469,59 +2720,10 @@ app.post(
         ]
       );
 
-      /*
-       * If there is already a valid
-       * pending request, return it instead
-       * of creating unlimited duplicates.
-       */
-
-      const existing =
-        await pool.query(
-          `
-          SELECT
-            id,
-            application_id,
-            type,
-            status,
-            requested_at,
-            expires_at
-          FROM access_requests
-          WHERE
-            application_id = $1
-            AND status = 'pending'
-            AND (
-              expires_at IS NULL
-              OR expires_at > NOW()
-            )
-          ORDER BY requested_at DESC
-          LIMIT 1
-          `,
-          [
-            row.id
-          ]
-        );
-
-      if (
-        existing.rows.length >
-        0
-      ) {
-
-        return res.json({
-          success: true,
-
-          request:
-            existing.rows[0],
-
-          existing:
-            true,
-
-          message:
-            "An active authorization request already exists."
-        });
-      }
 
       const requestId =
         crypto.randomUUID();
+
 
       const result =
         await pool.query(
@@ -2557,6 +2759,7 @@ app.post(
           ]
         );
 
+
       await writeAuditLog(
         "wrt_access_requested",
         row.id,
@@ -2565,16 +2768,20 @@ app.post(
         }
       );
 
+
       return res
         .status(201)
         .json({
-          success: true,
+
+          success:
+            true,
 
           request:
             result.rows[0],
 
           message:
             "Authorization request created."
+
         });
 
     } catch (
@@ -2586,15 +2793,19 @@ app.post(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to create authorization request."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    WRT — ACCESS INFORMATION
@@ -2602,6 +2813,7 @@ app.post(
 
 app.get(
   "/api/access/:requestId",
+
   accessLimiter,
 
   async (
@@ -2619,7 +2831,9 @@ app.get(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -2642,6 +2856,7 @@ app.get(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -2653,10 +2868,13 @@ app.get(
             error:
               "Authorization request not found."
           });
+
       }
+
 
       const request =
         result.rows[0];
+
 
       if (
         request.expires_at &&
@@ -2678,13 +2896,17 @@ app.get(
           ]
         );
 
+
         request.status =
           "expired";
+
       }
+
 
       return res.json({
 
-        success: true,
+        success:
+          true,
 
         request: {
 
@@ -2705,7 +2927,9 @@ app.get(
 
           expiresAt:
             request.expires_at
+
         }
+
       });
 
     } catch (
@@ -2717,15 +2941,19 @@ app.get(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to retrieve authorization request."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    WRT — PUBLIC APPROVE
@@ -2733,6 +2961,7 @@ app.get(
 
 app.post(
   "/api/access/:requestId/approve",
+
   accessLimiter,
 
   async (
@@ -2750,7 +2979,9 @@ app.post(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -2787,6 +3018,7 @@ app.post(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -2798,10 +3030,13 @@ app.post(
             error:
               "Request is invalid, expired, or already processed."
           });
+
       }
+
 
       const request =
         result.rows[0];
+
 
       await writeAuditLog(
         "wrt_user_approved",
@@ -2812,14 +3047,17 @@ app.post(
         }
       );
 
+
       return res.json({
 
-        success: true,
+        success:
+          true,
 
         authorized:
           true,
 
         request
+
       });
 
     } catch (
@@ -2831,15 +3069,19 @@ app.post(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to approve authorization."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    WRT — PUBLIC DENY
@@ -2847,6 +3089,7 @@ app.post(
 
 app.post(
   "/api/access/:requestId/deny",
+
   accessLimiter,
 
   async (
@@ -2864,7 +3107,9 @@ app.post(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -2890,6 +3135,7 @@ app.post(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -2901,10 +3147,13 @@ app.post(
             error:
               "Request is invalid, expired, or already processed."
           });
+
       }
+
 
       const request =
         result.rows[0];
+
 
       await writeAuditLog(
         "wrt_user_denied",
@@ -2915,14 +3164,17 @@ app.post(
         }
       );
 
+
       return res.json({
 
-        success: true,
+        success:
+          true,
 
         authorized:
           false,
 
         request
+
       });
 
     } catch (
@@ -2934,22 +3186,27 @@ app.post(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to deny authorization."
         });
+
     }
+
   }
 );
 
+
 /* =========================================================
-   WRT — ADMIN ACCESS STATUS
+   ADMIN — ACCESS STATUS
 ========================================================= */
 
 app.get(
   "/api/admin/applications/:id/access-status",
+
   requireAdmin,
 
   async (
@@ -2967,7 +3224,9 @@ app.get(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const application =
         await pool.query(
@@ -2984,6 +3243,7 @@ app.get(
           ]
         );
 
+
       if (
         application.rows.length ===
         0
@@ -2995,10 +3255,13 @@ app.get(
             error:
               "Application not found."
           });
+
       }
+
 
       const applicationId =
         application.rows[0].id;
+
 
       const result =
         await pool.query(
@@ -3019,8 +3282,10 @@ app.get(
           ]
         );
 
+
       const requests =
         result.rows;
+
 
       const active =
         requests.find(
@@ -3034,34 +3299,47 @@ app.get(
             ) {
 
               return false;
+
             }
+
 
             if (
               !request.expires_at
             ) {
 
               return true;
+
             }
+
 
             return (
               new Date(
                 request.expires_at
-              ) > new Date()
+              ) >
+              new Date()
             );
+
           }
         );
 
+
       return res.json({
 
-        success: true,
+        success:
+          true,
 
         authorized:
-          Boolean(active),
+          Boolean(
+            active
+          ),
 
         wrt:
-          Boolean(active),
+          Boolean(
+            active
+          ),
 
         requests
+
       });
 
     } catch (
@@ -3073,15 +3351,19 @@ app.get(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to retrieve authorization status."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — APPROVE ACCESS
@@ -3089,6 +3371,7 @@ app.get(
 
 app.patch(
   "/api/admin/access-requests/:requestId/approve",
+
   requireAdmin,
 
   async (
@@ -3106,7 +3389,9 @@ app.patch(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -3137,6 +3422,7 @@ app.patch(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -3148,10 +3434,13 @@ app.patch(
             error:
               "Authorization request not found, expired, or already processed."
           });
+
       }
+
 
       const request =
         result.rows[0];
+
 
       await writeAuditLog(
         "wrt_admin_approved",
@@ -3162,11 +3451,14 @@ app.patch(
         }
       );
 
+
       return res.json({
 
-        success: true,
+        success:
+          true,
 
         request
+
       });
 
     } catch (
@@ -3178,15 +3470,19 @@ app.patch(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to approve authorization."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — DENY ACCESS
@@ -3194,6 +3490,7 @@ app.patch(
 
 app.patch(
   "/api/admin/access-requests/:requestId/deny",
+
   requireAdmin,
 
   async (
@@ -3211,7 +3508,9 @@ app.patch(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -3229,6 +3528,7 @@ app.patch(
           ]
         );
 
+
       if (
         result.rows.length ===
         0
@@ -3240,10 +3540,13 @@ app.patch(
             error:
               "Authorization request not found or already processed."
           });
+
       }
+
 
       const request =
         result.rows[0];
+
 
       await writeAuditLog(
         "wrt_admin_denied",
@@ -3254,11 +3557,14 @@ app.patch(
         }
       );
 
+
       return res.json({
 
-        success: true,
+        success:
+          true,
 
         request
+
       });
 
     } catch (
@@ -3270,15 +3576,19 @@ app.patch(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to deny authorization."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — AUDIT LOGS
@@ -3286,6 +3596,7 @@ app.patch(
 
 app.get(
   "/api/admin/audit-logs",
+
   requireAdmin,
 
   async (
@@ -3303,7 +3614,9 @@ app.get(
             error:
               "Database is not configured."
           });
+
       }
+
 
       const result =
         await pool.query(
@@ -3320,12 +3633,15 @@ app.get(
           `
         );
 
+
       return res.json({
 
-        success: true,
+        success:
+          true,
 
         logs:
           result.rows
+
       });
 
     } catch (
@@ -3337,15 +3653,19 @@ app.get(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "Unable to retrieve audit logs."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    ADMIN — AI ANALYSIS
@@ -3353,6 +3673,7 @@ app.get(
 
 app.post(
   "/api/admin/ai/analyze",
+
   requireAdmin,
 
   async (
@@ -3370,10 +3691,13 @@ app.post(
             error:
               "AI_API_KEY is not configured."
           });
+
       }
+
 
       const input =
         req.body?.input;
+
 
       if (
         !input ||
@@ -3387,54 +3711,26 @@ app.post(
             error:
               "AI input is required."
           });
+
       }
 
-      /*
-       * Prevent extremely large AI requests.
-       */
-
-      const cleanInput =
-        input.trim();
-
-      if (
-        cleanInput.length ===
-        0
-      ) {
-
-        return res
-          .status(400)
-          .json({
-            error:
-              "AI input is required."
-          });
-      }
-
-      if (
-        cleanInput.length >
-        50000
-      ) {
-
-        return res
-          .status(400)
-          .json({
-            error:
-              "AI input is too large."
-          });
-      }
 
       const response =
         await fetch(
           AI_API_URL,
           {
+
             method:
               "POST",
 
             headers: {
+
               "Content-Type":
                 "application/json",
 
               "Authorization":
                 `Bearer ${AI_API_KEY}`
+
             },
 
             body:
@@ -3446,39 +3742,39 @@ app.post(
                 messages: [
 
                   {
+
                     role:
                       "system",
 
                     content:
-                      "You are an administrative application-analysis assistant. Analyze supplied application information factually and clearly. Do not invent missing information. Clearly identify missing, inconsistent, or uncertain information."
+                      "You are an administrative application-analysis assistant. Analyze supplied application information factually and clearly. Do not invent missing information."
+
                   },
 
                   {
+
                     role:
                       "user",
 
                     content:
-                      cleanInput
+                      input
+
                   }
+
                 ],
 
                 temperature:
                   0.2
+
               })
+
           }
         );
 
-      let data = null;
 
-      try {
+      const data =
+        await response.json();
 
-        data =
-          await response.json();
-
-      } catch {
-
-        data = null;
-      }
 
       if (
         !response.ok
@@ -3489,22 +3785,25 @@ app.post(
           data
         );
 
+
         return res
           .status(502)
           .json({
             error:
               "AI provider request failed."
           });
+
       }
+
 
       const answer =
         data?.choices?.[0]
-          ?.message
-          ?.content ||
+          ?.message?.content ||
         data?.output?.[0]
           ?.content?.[0]
           ?.text ||
         "";
+
 
       if (!answer) {
 
@@ -3514,7 +3813,9 @@ app.post(
             error:
               "AI provider returned no usable response."
           });
+
       }
+
 
       await writeAuditLog(
         "ai_analysis_requested",
@@ -3525,15 +3826,18 @@ app.post(
         }
       );
 
+
       return res.json({
 
-        success: true,
+        success:
+          true,
 
         model:
           AI_MODEL,
 
         analysis:
           answer
+
       });
 
     } catch (
@@ -3545,15 +3849,19 @@ app.post(
         error
       );
 
+
       return res
         .status(500)
         .json({
           error:
             "AI analysis failed."
         });
+
     }
+
   }
 );
+
 
 /* =========================================================
    STATIC FRONTEND SECURITY
@@ -3562,22 +3870,19 @@ app.post(
 /*
 IMPORTANT:
 
-The frontend is located in the project root.
+The frontend is in the project root.
 
-However, uploaded files are also inside the
-project root.
+We cannot simply expose everything in the root because
+that could expose:
 
-Therefore we must NOT allow Express static
-serving to expose:
+- .env
+- server.js
+- data
+- uploads
+- package files
+- node_modules
 
-  /uploads
-  /data
-  /server.js
-  /.env
-  /node_modules
-
-The API routes above have already been registered,
-so /api requests will not be handled by static files.
+Therefore sensitive paths are blocked.
 */
 
 app.use(
@@ -3587,56 +3892,97 @@ app.use(
     next
   ) => {
 
-    const requestPath =
+    const pathname =
       decodeURIComponent(
-        req.path || ""
+        req.path
       );
 
-    const blockedPaths = [
-      "/uploads",
-      "/data",
-      "/server.js",
-      "/package.json",
-      "/package-lock.json",
-      "/node_modules"
-    ];
 
     const blocked =
-      blockedPaths.some(
-        (blockedPath) =>
-          requestPath ===
-            blockedPath ||
-          requestPath.startsWith(
-            blockedPath + "/"
+      [
+
+        "/server.js",
+
+        "/.env",
+
+        "/data",
+
+        "/uploads",
+
+        "/node_modules",
+
+        "/package.json",
+
+        "/package-lock.json",
+
+        "/yarn.lock",
+
+        "/pnpm-lock.yaml"
+
+      ];
+
+
+    const isBlocked =
+      blocked.some(
+        (
+          item
+        ) =>
+          pathname ===
+            item ||
+          pathname.startsWith(
+            item + "/"
           )
       );
 
-    if (blocked) {
+
+    if (
+      isBlocked
+    ) {
 
       return res
         .status(404)
         .send(
           "Not Found"
         );
+
     }
 
+
+    if (
+      pathname.startsWith(
+        "/."
+      )
+    ) {
+
+      return res
+        .status(404)
+        .send(
+          "Not Found"
+        );
+
+    }
+
+
     next();
+
   }
 );
 
+
 /* =========================================================
-   STATIC FRONTEND
+   STATIC FILES
 ========================================================= */
 
 app.use(
   express.static(
-    PROJECT_DIR,
+    ROOT_DIR,
     {
-      index: false,
-      dotfiles: "deny"
+      index:
+        false
     }
   )
 );
+
 
 /* =========================================================
    ROOT
@@ -3644,16 +3990,34 @@ app.use(
 
 app.get(
   "/",
+
   (
     req,
     res
   ) => {
 
+    if (
+      !fs.existsSync(
+        INDEX_FILE
+      )
+    ) {
+
+      return res
+        .status(404)
+        .send(
+          "index.html not found."
+        );
+
+    }
+
+
     return res.sendFile(
       INDEX_FILE
     );
+
   }
 );
+
 
 /* =========================================================
    API 404
@@ -3661,6 +4025,7 @@ app.get(
 
 app.use(
   "/api",
+
   (
     req,
     res
@@ -3672,8 +4037,10 @@ app.use(
         error:
           "API endpoint not found."
       });
+
   }
 );
+
 
 /* =========================================================
    GLOBAL ERROR HANDLER
@@ -3692,9 +4059,6 @@ app.use(
       error
     );
 
-    /*
-     * Multer errors
-     */
 
     if (
       error instanceof
@@ -3712,7 +4076,9 @@ app.use(
             error:
               "File exceeds the 10 MB limit."
           });
+
       }
+
 
       if (
         error.code ===
@@ -3725,20 +4091,9 @@ app.use(
             error:
               "Too many files uploaded."
           });
+
       }
 
-      if (
-        error.code ===
-        "LIMIT_UNEXPECTED_FILE"
-      ) {
-
-        return res
-          .status(400)
-          .json({
-            error:
-              "Unexpected file field."
-          });
-      }
 
       return res
         .status(400)
@@ -3746,11 +4101,9 @@ app.use(
           error:
             error.message
         });
+
     }
 
-    /*
-     * File type error
-     */
 
     if (
       error?.message ===
@@ -3763,37 +4116,9 @@ app.use(
           error:
             "Unsupported file type."
         });
+
     }
 
-    /*
-     * CORS error
-     */
-
-    if (
-      error?.message ===
-      "Origin not allowed by CORS"
-    ) {
-
-      return res
-        .status(403)
-        .json({
-          error:
-            "Origin not allowed."
-        });
-    }
-
-    /*
-     * Already handled response
-     */
-
-    if (
-      res.headersSent
-    ) {
-
-      return next(
-        error
-      );
-    }
 
     return res
       .status(500)
@@ -3801,8 +4126,10 @@ app.use(
         error:
           "Internal server error."
       });
+
   }
 );
+
 
 /* =========================================================
    START SERVER
@@ -3814,6 +4141,7 @@ async function startServer() {
 
     await initializeDatabase();
 
+
     app.listen(
       PORT,
       "0.0.0.0",
@@ -3824,15 +4152,11 @@ async function startServer() {
         );
 
         console.log(
-          "APPLICATION FORM MANAGEMENT SYSTEM"
+          "Application Form Management System"
         );
 
         console.log(
-          "=============================================="
-        );
-
-        console.log(
-          `Server running on port: ${PORT}`
+          `Server running on port ${PORT}`
         );
 
         console.log(
@@ -3846,30 +4170,15 @@ async function startServer() {
         );
 
         console.log(
-          `Admin configured: ${Boolean(
-            ADMIN_TOKEN
-          )}`
-        );
-
-        console.log(
-          `Session configured: ${Boolean(
-            SESSION_SECRET
-          )}`
-        );
-
-        console.log(
           `AI configured: ${Boolean(
             AI_API_KEY
           )}`
         );
 
         console.log(
-          `Frontend origin: ${FRONTEND_ORIGIN}`
-        );
-
-        console.log(
           "=============================================="
         );
+
       }
     );
 
@@ -3885,7 +4194,10 @@ async function startServer() {
     process.exit(
       1
     );
+
   }
+
 }
+
 
 startServer();
