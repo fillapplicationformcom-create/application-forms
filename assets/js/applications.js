@@ -1,40 +1,17 @@
 "use strict";
 
+window.API_BASE_URL =
+  "https://application-forms-1-yt65.onrender.com/api";
 /*
 ============================================================
 APPLICATION FORM MANAGEMENT SYSTEM
 APPLICATIONS MODULE
 ============================================================
 
-Path:
-assets/js/applications.js
-
-Purpose:
-- Submit public applications
-- Handle multipart/form-data
-- Upload photo, resume and documents
-- Load admin applications
-- Search/filter applications
-- View individual applications
-- Update application status
-- Generate application PDF
-- Open uploaded files
-- Request WRT authorization
-- Check WRT authorization status
-
-Backend:
-Node.js + Express + PostgreSQL
-
-Compatible with:
-- config.js
-- auth.js
-- admin.js
-- dashboard.js
-- ui.js
-- validation.js
-
-============================================================
-*/
+*/const API_BASE =
+  window.API_BASE_URL ||
+  window.API_BASE ||
+  "/api";
 
 (function () {
 
