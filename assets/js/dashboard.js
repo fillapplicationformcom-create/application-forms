@@ -7,7 +7,7 @@ ADMIN DASHBOARD MODULE
 ============================================================
 
 Path:
-public/assets/js/dashboard.js
+assets/js/dashboard.js
 
 Purpose:
 - Load dashboard statistics
