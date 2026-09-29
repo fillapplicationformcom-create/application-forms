@@ -3,20 +3,21 @@
 /*
 ============================================================
 APPLICATION FORM MANAGEMENT SYSTEM
-ADMIN DASHBOARD MODULE
+DASHBOARD.JS
 ============================================================
 
-Path:
-assets/js/dashboard.js
-
 Purpose:
+- Wait for administrator authentication
 - Load dashboard statistics
-- Load recent applications
-- Display application counts
+- Load applications
+- Display recent applications
 - Display status breakdown
-- Connect dashboard UI with admin APIs
-- Use existing auth.js / admin.js modules
-- No duplicate authentication system
+- Search applications
+- Refresh dashboard
+
+IMPORTANT:
+This module does NOT start before authentication is ready.
+This prevents the login/dashboard blinking loop.
 ============================================================
 */
 
@@ -25,24 +26,36 @@ Purpose:
   const API_BASE = "/api";
 
   let applications = [];
+  let dashboardInitialized = false;
+  let authenticationReady = false;
+  let authenticated = false;
+  let loadingDashboard = false;
 
 
   /* ========================================================
      HELPERS
   ======================================================== */
 
+  function getAdmin() {
+    return window.ApplicationAdmin || null;
+  }
+
+
   function getToken() {
 
+    const ADMIN = getAdmin();
+
     if (
-      typeof window.getAdminToken === "function"
+      ADMIN &&
+      typeof ADMIN.getToken === "function"
     ) {
-      return window.getAdminToken();
+      return ADMIN.getToken();
     }
 
     return (
-      localStorage.getItem("adminToken") ||
-      sessionStorage.getItem("adminToken") ||
-      ""
+      localStorage.getItem(
+        "application_form_admin_token"
+      ) || ""
     );
 
   }
@@ -132,16 +145,24 @@ Purpose:
     const token =
       getToken();
 
+
+    if (!token) {
+
+      throw new Error(
+        "Administrator authentication required."
+      );
+
+    }
+
+
     const headers = {
       ...(options.headers || {})
     };
 
-    if (token) {
 
-      headers.Authorization =
-        `Bearer ${token}`;
+    headers.Authorization =
+      `Bearer ${token}`;
 
-    }
 
     if (
       options.body &&
@@ -178,28 +199,32 @@ Purpose:
     }
 
 
-    if (
-      response.status === 401
-    ) {
+    if (response.status === 401) {
+
+      authenticated = false;
+
+
+      const ADMIN =
+        getAdmin();
+
 
       if (
-        typeof window.logoutAdmin ===
+        ADMIN &&
+        typeof ADMIN.clearToken ===
         "function"
       ) {
 
-        window.logoutAdmin();
-
-      } else {
-
-        localStorage.removeItem(
-          "adminToken"
-        );
-
-        sessionStorage.removeItem(
-          "adminToken"
-        );
+        ADMIN.clearToken();
 
       }
+
+
+      document.dispatchEvent(
+        new CustomEvent(
+          "admin:unauthorized"
+        )
+      );
+
 
       throw new Error(
         "Administrator session expired."
@@ -212,6 +237,7 @@ Purpose:
 
       throw new Error(
         data.error ||
+        data.message ||
         "Dashboard request failed."
       );
 
@@ -231,13 +257,16 @@ Purpose:
 
     const result =
       await apiRequest(
-        "/admin/applications"
+        "/admin/applications",
+        {
+          method: "GET"
+        }
       );
 
 
     applications =
       Array.isArray(
-        result.applications
+        result?.applications
       )
         ? result.applications
         : [];
@@ -249,7 +278,7 @@ Purpose:
 
 
   /* ========================================================
-     CALCULATE STATISTICS
+     STATISTICS
   ======================================================== */
 
   function calculateStatistics(
@@ -281,7 +310,7 @@ Purpose:
 
       const status =
         String(
-          application.status || ""
+          application?.status || ""
         ).trim();
 
 
@@ -326,7 +355,7 @@ Purpose:
 
 
   /* ========================================================
-     UPDATE STATISTIC CARDS
+     STATISTIC CARDS
   ======================================================== */
 
   function renderStatistics(
@@ -458,7 +487,7 @@ Purpose:
 
     container.innerHTML =
       recent.map(
-        (application) => {
+        application => {
 
           const data =
             application.applicant_data || {};
@@ -483,11 +512,17 @@ Purpose:
             "Submitted";
 
 
+          const applicationId =
+            application.application_id ||
+            application.id ||
+            "";
+
+
           return `
             <div
               class="application-row"
               data-application-id="${escapeHTML(
-                application.application_id
+                applicationId
               )}"
             >
 
@@ -505,13 +540,12 @@ Purpose:
 
 
               <div class="application-id">
-                ${escapeHTML(
-                  application.application_id
-                )}
+                ${escapeHTML(applicationId)}
               </div>
 
 
               <div class="application-status">
+
                 <span
                   class="status-badge status-${escapeHTML(
                     getStatusClass(status)
@@ -519,6 +553,7 @@ Purpose:
                 >
                   ${escapeHTML(status)}
                 </span>
+
               </div>
 
 
@@ -607,7 +642,7 @@ Purpose:
 
     container.innerHTML =
       statuses
-        .map((item) => {
+        .map(item => {
 
           const percentage =
             Math.round(
@@ -624,9 +659,7 @@ Purpose:
               <div class="status-breakdown-header">
 
                 <span>
-                  ${escapeHTML(
-                    item.name
-                  )}
+                  ${escapeHTML(item.name)}
                 </span>
 
                 <strong>
@@ -655,7 +688,7 @@ Purpose:
 
 
   /* ========================================================
-     EMPTY / ERROR STATE
+     ERROR
   ======================================================== */
 
   function showDashboardError(
@@ -702,43 +735,35 @@ Purpose:
 
 
   /* ========================================================
-     LOADING STATE
+     LOADING
   ======================================================== */
 
   function setLoading(
     loading
   ) {
 
-    const elements =
-      document.querySelectorAll(
+    document
+      .querySelectorAll(
         "[data-dashboard-loading]"
-      );
-
-
-    elements.forEach(
-      (element) => {
+      )
+      .forEach(element => {
 
         element.hidden =
           !loading;
 
-      }
-    );
+      });
 
 
-    const content =
-      document.querySelectorAll(
+    document
+      .querySelectorAll(
         "[data-dashboard-content]"
-      );
-
-
-    content.forEach(
-      (element) => {
+      )
+      .forEach(element => {
 
         element.hidden =
           loading;
 
-      }
-    );
+      });
 
   }
 
@@ -748,6 +773,29 @@ Purpose:
   ======================================================== */
 
   async function refreshDashboard() {
+
+    /*
+     * Never load dashboard data until
+     * authentication has completed.
+     */
+
+    if (!authenticationReady) {
+      return null;
+    }
+
+
+    if (!authenticated) {
+      return null;
+    }
+
+
+    if (loadingDashboard) {
+      return null;
+    }
+
+
+    loadingDashboard = true;
+
 
     hideDashboardError();
 
@@ -782,11 +830,8 @@ Purpose:
 
 
       return {
-        applications:
-          list,
-
+        applications: list,
         statistics
-
       };
 
     } catch(error) {
@@ -797,15 +842,23 @@ Purpose:
       );
 
 
-      showDashboardError(
-        error.message ||
-        "Unable to load dashboard."
-      );
+      if (
+        authenticated
+      ) {
+
+        showDashboardError(
+          error.message ||
+          "Unable to load dashboard."
+        );
+
+      }
 
 
       return null;
 
     } finally {
+
+      loadingDashboard = false;
 
       setLoading(false);
 
@@ -815,7 +868,7 @@ Purpose:
 
 
   /* ========================================================
-     APPLICATION SEARCH
+     SEARCH
   ======================================================== */
 
   function filterApplications(
@@ -843,7 +896,7 @@ Purpose:
 
     const filtered =
       applications.filter(
-        (application) => {
+        application => {
 
           const data =
             application.applicant_data ||
@@ -851,18 +904,18 @@ Purpose:
 
 
           const searchable =
-            JSON.stringify(
-              {
-                applicationId:
-                  application.application_id,
+            JSON.stringify({
+              applicationId:
+                application.application_id,
 
-                status:
-                  application.status,
+              id:
+                application.id,
 
-                data
+              status:
+                application.status,
 
-              }
-            )
+              data
+            })
             .toLowerCase();
 
 
@@ -926,33 +979,36 @@ Purpose:
       );
 
 
-    buttons.forEach(
-      (button) => {
+    buttons.forEach(button => {
 
-        button.addEventListener(
-          "click",
-          async () => {
+      button.addEventListener(
+        "click",
+        async () => {
 
-            button.disabled =
-              true;
+          if (
+            !authenticated
+          ) {
+            return;
+          }
 
 
-            try {
+          button.disabled = true;
 
-              await refreshDashboard();
 
-            } finally {
+          try {
 
-              button.disabled =
-                false;
+            await refreshDashboard();
 
-            }
+          } finally {
+
+            button.disabled = false;
 
           }
-        );
 
-      }
-    );
+        }
+      );
+
+    });
 
   }
 
@@ -965,7 +1021,7 @@ Purpose:
 
     document.addEventListener(
       "click",
-      (event) => {
+      event => {
 
         const row =
           event.target.closest(
@@ -982,6 +1038,11 @@ Purpose:
           row.dataset.applicationId;
 
 
+        if (!applicationId) {
+          return;
+        }
+
+
         if (
           typeof window.openApplication ===
           "function"
@@ -996,10 +1057,6 @@ Purpose:
         }
 
 
-        /*
-         * Compatible fallback.
-         */
-
         window.location.href =
           `application.html?id=${encodeURIComponent(
             applicationId
@@ -1012,10 +1069,117 @@ Purpose:
 
 
   /* ========================================================
+     AUTHENTICATION EVENTS
+     ======================================================== */
+
+  function bindAuthenticationEvents() {
+
+    /*
+     * Authentication succeeded.
+     */
+
+    document.addEventListener(
+      "auth:authenticated",
+      async () => {
+
+        authenticationReady = true;
+        authenticated = true;
+
+        await refreshDashboard();
+
+      }
+    );
+
+
+    /*
+     * Login succeeded.
+     */
+
+    document.addEventListener(
+      "auth:login-success",
+      async () => {
+
+        authenticationReady = true;
+        authenticated = true;
+
+        await refreshDashboard();
+
+      }
+    );
+
+
+    /*
+     * Authentication failed.
+     */
+
+    document.addEventListener(
+      "auth:unauthenticated",
+      () => {
+
+        authenticationReady = true;
+        authenticated = false;
+
+        applications = [];
+
+        setLoading(false);
+
+      }
+    );
+
+
+    /*
+     * Logout.
+     */
+
+    document.addEventListener(
+      "auth:logout",
+      () => {
+
+        authenticationReady = true;
+        authenticated = false;
+
+        applications = [];
+
+      }
+    );
+
+
+    /*
+     * Unauthorized API response.
+     */
+
+    document.addEventListener(
+      "admin:unauthorized",
+      () => {
+
+        authenticationReady = true;
+        authenticated = false;
+
+        applications = [];
+
+      }
+    );
+
+  }
+
+
+  /* ========================================================
      INITIALIZATION
   ======================================================== */
 
-  async function initializeDashboard() {
+  function initializeDashboard() {
+
+    /*
+     * Prevent duplicate initialization.
+     */
+
+    if (dashboardInitialized) {
+      return;
+    }
+
+
+    dashboardInitialized = true;
+
 
     bindSearch();
 
@@ -1023,14 +1187,25 @@ Purpose:
 
     bindApplicationClicks();
 
-    await refreshDashboard();
+    bindAuthenticationEvents();
+
+
+    /*
+     * IMPORTANT:
+     *
+     * We intentionally DO NOT call
+     * refreshDashboard() here.
+     *
+     * auth.js is responsible for checking
+     * authentication first.
+     */
 
   }
 
 
   /* ========================================================
      PUBLIC API
-  ======================================================== */
+     ======================================================== */
 
   window.dashboard = {
 
@@ -1060,9 +1235,9 @@ Purpose:
     refreshDashboard;
 
 
-  /*
-   * Start after DOM is ready.
-   */
+  /* ========================================================
+     START
+     ======================================================== */
 
   if (
     document.readyState ===
@@ -1071,7 +1246,10 @@ Purpose:
 
     document.addEventListener(
       "DOMContentLoaded",
-      initializeDashboard
+      initializeDashboard,
+      {
+        once: true
+      }
     );
 
   } else {
