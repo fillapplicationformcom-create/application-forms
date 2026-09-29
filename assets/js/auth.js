@@ -2,8 +2,8 @@
 
 /*
 ============================================================
-APPLICATION FORM MANAGEMENT SYSTEM
 AUTH.JS
+APPLICATION FORM MANAGEMENT SYSTEM
 ============================================================
 
 Purpose:
@@ -23,15 +23,17 @@ Backend:
     /api/admin/logout
     /api/admin/applications
 
-No credentials are stored in this file.
+Important:
+- Prevents duplicate authentication events
+- Prevents repeated login checks
+- Prevents dashboard/login screen flickering
+- Does not store administrator credentials
 ============================================================
 */
 
 (function () {
 
-  const ADMIN =
-    window.ApplicationAdmin || null;
-
+  const ADMIN = window.ApplicationAdmin || null;
 
   /* ========================================================
      CONFIGURATION
@@ -39,31 +41,34 @@ No credentials are stored in this file.
 
   const SELECTORS = {
 
-    loginForm:
-      "#adminLoginForm",
+    loginForm: "#adminLoginForm",
 
-    tokenInput:
-      "#adminToken",
+    tokenInput: "#adminToken",
 
-    loginButton:
-      "#adminLoginButton",
+    loginButton: "#adminLoginButton",
 
-    logoutButton:
-      "#adminLogoutButton",
+    logoutButton: "#adminLogoutButton",
 
-    loginSection:
-      "#adminLoginSection",
+    loginSection: "#adminLoginSection",
 
-    dashboardSection:
-      "#adminDashboardSection",
+    dashboardSection: "#adminDashboardSection",
 
-    authMessage:
-      "#adminAuthMessage",
+    authMessage: "#adminAuthMessage",
 
-    authStatus:
-      "#adminAuthStatus"
+    authStatus: "#adminAuthStatus"
 
   };
+
+
+  /* ========================================================
+     INTERNAL STATE
+  ======================================================== */
+
+  let authenticationCheckRunning = false;
+
+  let loginRunning = false;
+
+  let currentAuthState = null;
 
 
   /* ========================================================
@@ -72,9 +77,7 @@ No credentials are stored in this file.
 
   function getElement(selector) {
 
-    return document.querySelector(
-      selector
-    );
+    return document.querySelector(selector);
 
   }
 
@@ -82,45 +85,60 @@ No credentials are stored in this file.
   function getElements(selector) {
 
     return Array.from(
-      document.querySelectorAll(
-        selector
-      )
+      document.querySelectorAll(selector)
     );
 
   }
 
 
-  function setText(
-    element,
-    text
-  ) {
+  function setVisible(element, visible) {
+
+    if (!element) {
+      return;
+    }
+
+    element.hidden = !visible;
+
+    element.style.display =
+      visible ? "" : "none";
+
+  }
+
+
+  function showMessage(message, type = "info") {
+
+    const element =
+      getElement(SELECTORS.authMessage);
+
+    if (!element) {
+      return;
+    }
+
+    element.textContent = message || "";
+
+    element.dataset.type = type;
+
+    element.hidden = !message;
+
+  }
+
+
+  function setAuthStatus(authenticated) {
+
+    const element =
+      getElement(SELECTORS.authStatus);
 
     if (!element) {
       return;
     }
 
     element.textContent =
-      text || "";
+      authenticated
+        ? "Authenticated"
+        : "Not authenticated";
 
-  }
-
-
-  function setVisible(
-    element,
-    visible
-  ) {
-
-    if (!element) {
-      return;
-    }
-
-    element.hidden =
-      !visible;
-
-    element.style.display =
-      visible
-        ? ""
-        : "none";
+    element.dataset.authenticated =
+      authenticated ? "true" : "false";
 
   }
 
@@ -128,110 +146,35 @@ No credentials are stored in this file.
   function setLoading(
     button,
     loading,
-    normalText
+    normalText = "Login"
   ) {
 
     if (!button) {
       return;
     }
 
-
-    if (
-      !button.dataset.originalText
-    ) {
+    if (!button.dataset.originalText) {
 
       button.dataset.originalText =
-        normalText ||
         button.textContent ||
-        "Login";
+        normalText;
 
     }
 
-
-    button.disabled =
-      loading;
-
+    button.disabled = loading;
 
     button.setAttribute(
       "aria-busy",
-      loading
-        ? "true"
-        : "false"
+      loading ? "true" : "false"
     );
-
 
     button.textContent =
       loading
         ? "Please wait..."
         : (
-            normalText ||
-            button.dataset.originalText
+            button.dataset.originalText ||
+            normalText
           );
-
-  }
-
-
-  function showMessage(
-    message,
-    type = "info"
-  ) {
-
-    const element =
-      getElement(
-        SELECTORS.authMessage
-      );
-
-
-    if (!element) {
-
-      console.log(
-        `[${type}] ${message}`
-      );
-
-      return;
-
-    }
-
-
-    element.textContent =
-      message || "";
-
-
-    element.dataset.type =
-      type;
-
-
-    element.hidden =
-      !message;
-
-  }
-
-
-  function setAuthStatus(
-    authenticated
-  ) {
-
-    const element =
-      getElement(
-        SELECTORS.authStatus
-      );
-
-
-    if (!element) {
-      return;
-    }
-
-
-    element.textContent =
-      authenticated
-        ? "Authenticated"
-        : "Not authenticated";
-
-
-    element.dataset.authenticated =
-      authenticated
-        ? "true"
-        : "false";
 
   }
 
@@ -240,52 +183,60 @@ No credentials are stored in this file.
      UI STATE
   ======================================================== */
 
-  function showLoginScreen() {
+  function showLoginScreen(options = {}) {
+
+    const force =
+      options.force === true;
+
+    if (
+      !force &&
+      currentAuthState === false
+    ) {
+      return;
+    }
+
+    currentAuthState = false;
 
     setVisible(
-      getElement(
-        SELECTORS.loginSection
-      ),
+      getElement(SELECTORS.loginSection),
       true
     );
 
-
     setVisible(
-      getElement(
-        SELECTORS.dashboardSection
-      ),
+      getElement(SELECTORS.dashboardSection),
       false
     );
 
-
-    setAuthStatus(
-      false
-    );
+    setAuthStatus(false);
 
   }
 
 
-  function showDashboardScreen() {
+  function showDashboardScreen(options = {}) {
+
+    const force =
+      options.force === true;
+
+    if (
+      !force &&
+      currentAuthState === true
+    ) {
+      return;
+    }
+
+    currentAuthState = true;
 
     setVisible(
-      getElement(
-        SELECTORS.loginSection
-      ),
+      getElement(SELECTORS.loginSection),
       false
     );
 
-
     setVisible(
-      getElement(
-        SELECTORS.dashboardSection
-      ),
+      getElement(SELECTORS.dashboardSection),
       true
     );
 
-
-    setAuthStatus(
-      true
-    );
+    setAuthStatus(true);
 
   }
 
@@ -294,9 +245,7 @@ No credentials are stored in this file.
      LOGIN
   ======================================================== */
 
-  async function login(
-    token
-  ) {
+  async function login(token) {
 
     if (!ADMIN) {
 
@@ -306,12 +255,17 @@ No credentials are stored in this file.
 
     }
 
+    if (loginRunning) {
+
+      return {
+        success: false,
+        alreadyRunning: true
+      };
+
+    }
 
     const administratorToken =
-      String(
-        token || ""
-      ).trim();
-
+      String(token || "").trim();
 
     if (!administratorToken) {
 
@@ -326,12 +280,10 @@ No credentials are stored in this file.
 
     }
 
+    loginRunning = true;
 
     const button =
-      getElement(
-        SELECTORS.loginButton
-      );
-
+      getElement(SELECTORS.loginButton);
 
     setLoading(
       button,
@@ -339,29 +291,38 @@ No credentials are stored in this file.
       "Login"
     );
 
-
     showMessage(
       "Authenticating administrator...",
       "info"
     );
 
-
     try {
+
+      /*
+       * admin.js performs the actual API login.
+       *
+       * IMPORTANT:
+       * We do not dispatch another auth:login-success
+       * here. admin.js already dispatches admin:login.
+       */
 
       const result =
         await ADMIN.adminLogin(
           administratorToken
         );
 
+      showDashboardScreen({
+        force: true
+      });
 
       showMessage(
         "Administrator login successful.",
         "success"
       );
 
-
-      showDashboardScreen();
-
+      /*
+       * Only one application-level login event.
+       */
 
       document.dispatchEvent(
         new CustomEvent(
@@ -372,20 +333,19 @@ No credentials are stored in this file.
         )
       );
 
-
       return result;
 
-    } catch(error) {
+    } catch (error) {
+
+      showLoginScreen({
+        force: true
+      });
 
       showMessage(
-        error.message ||
+        error?.message ||
           "Login failed.",
         "error"
       );
-
-
-      showLoginScreen();
-
 
       document.dispatchEvent(
         new CustomEvent(
@@ -398,10 +358,11 @@ No credentials are stored in this file.
         )
       );
 
-
       throw error;
 
     } finally {
+
+      loginRunning = false;
 
       setLoading(
         button,
@@ -420,31 +381,39 @@ No credentials are stored in this file.
 
   async function logout() {
 
+    if (!ADMIN) {
+
+      showLoginScreen({
+        force: true
+      });
+
+      return;
+
+    }
+
     try {
 
-      if (ADMIN) {
+      await ADMIN.adminLogout();
 
-        await ADMIN.adminLogout();
-
-      }
-
-    } catch(error) {
+    } catch (error) {
 
       console.warn(
-        "Logout error:",
-        error.message
+        "Logout request failed:",
+        error?.message
       );
 
     } finally {
 
-      showLoginScreen();
+      currentAuthState = null;
 
+      showLoginScreen({
+        force: true
+      });
 
       showMessage(
         "You have been logged out.",
         "success"
       );
-
 
       document.dispatchEvent(
         new CustomEvent(
@@ -465,37 +434,52 @@ No credentials are stored in this file.
 
     if (!ADMIN) {
 
-      showLoginScreen();
+      showLoginScreen({
+        force: true
+      });
 
       return false;
 
     }
 
+    /*
+     * Prevent multiple simultaneous
+     * session checks.
+     */
 
-    if (
-      !ADMIN.isLoggedIn()
-    ) {
+    if (authenticationCheckRunning) {
 
-      showLoginScreen();
+      return (
+        currentAuthState === true
+      );
+
+    }
+
+    if (!ADMIN.isLoggedIn()) {
+
+      showLoginScreen({
+        force: true
+      });
 
       return false;
 
     }
 
+    authenticationCheckRunning = true;
 
     try {
 
       const session =
         await ADMIN.checkAdminSession();
 
-
       if (
         session &&
         session.authenticated
       ) {
 
-        showDashboardScreen();
-
+        showDashboardScreen({
+          force: true
+        });
 
         document.dispatchEvent(
           new CustomEvent(
@@ -506,14 +490,13 @@ No credentials are stored in this file.
           )
         );
 
-
         return true;
 
       }
 
-
-      showLoginScreen();
-
+      showLoginScreen({
+        force: true
+      });
 
       document.dispatchEvent(
         new CustomEvent(
@@ -521,20 +504,24 @@ No credentials are stored in this file.
         )
       );
 
-
       return false;
 
-    } catch(error) {
+    } catch (error) {
 
       console.warn(
         "Authentication check failed:",
-        error.message
+        error?.message
       );
 
-
-      showLoginScreen();
+      showLoginScreen({
+        force: true
+      });
 
       return false;
+
+    } finally {
+
+      authenticationCheckRunning = false;
 
     }
 
@@ -570,14 +557,14 @@ No credentials are stored in this file.
   function clearAuthentication() {
 
     if (ADMIN) {
-
       ADMIN.clearToken();
-
     }
 
+    currentAuthState = null;
 
-    showLoginScreen();
-
+    showLoginScreen({
+      force: true
+    });
 
     document.dispatchEvent(
       new CustomEvent(
@@ -592,32 +579,28 @@ No credentials are stored in this file.
      LOGIN FORM
   ======================================================== */
 
-  function handleLoginSubmit(
-    event
-  ) {
+  function handleLoginSubmit(event) {
 
     event.preventDefault();
 
+    if (loginRunning) {
+      return;
+    }
 
     const form =
       event.currentTarget;
-
 
     const input =
       form.querySelector(
         SELECTORS.tokenInput
       );
 
-
     const token =
       input
         ? input.value
         : "";
 
-
-    login(
-      token
-    ).catch(
+    login(token).catch(
       error => {
 
         console.error(
@@ -639,29 +622,40 @@ No credentials are stored in this file.
 
     getElements(
       SELECTORS.logoutButton
-    )
-      .forEach(
-        button => {
+    ).forEach(
+      button => {
 
-          button.addEventListener(
-            "click",
-            event => {
+        /*
+         * Prevent binding the same button twice.
+         */
 
-              event.preventDefault();
-
-              logout();
-
-            }
-          );
-
+        if (
+          button.dataset.authLogoutBound === "true"
+        ) {
+          return;
         }
-      );
+
+        button.dataset.authLogoutBound = "true";
+
+        button.addEventListener(
+          "click",
+          event => {
+
+            event.preventDefault();
+
+            logout();
+
+          }
+        );
+
+      }
+    );
 
   }
 
 
   /* ========================================================
-     FORM INITIALIZATION
+     LOGIN FORM INITIALIZATION
   ======================================================== */
 
   function bindLoginForm() {
@@ -671,11 +665,17 @@ No credentials are stored in this file.
         SELECTORS.loginForm
       );
 
-
     if (!form) {
       return;
     }
 
+    if (
+      form.dataset.authLoginBound === "true"
+    ) {
+      return;
+    }
+
+    form.dataset.authLoginBound = "true";
 
     form.addEventListener(
       "submit",
@@ -692,29 +692,26 @@ No credentials are stored in this file.
   function protectAdminPage() {
 
     const pageRequiresAuth =
-      document.body?.dataset
-        ?.adminProtected ===
-      "true";
-
+      document.body?.dataset?.adminProtected === "true";
 
     if (!pageRequiresAuth) {
       return;
     }
 
+    checkAuthentication().catch(
+      error => {
 
-    checkAuthentication()
-      .catch(
-        error => {
+        console.error(
+          "Admin page protection error:",
+          error
+        );
 
-          console.error(
-            "Admin page protection error:",
-            error
-          );
+        showLoginScreen({
+          force: true
+        });
 
-          showLoginScreen();
-
-        }
-      );
+      }
+    );
 
   }
 
@@ -725,12 +722,15 @@ No credentials are stored in this file.
 
   function bindAdminEvents() {
 
+    /*
+     * SESSION EXPIRED
+     */
+
     document.addEventListener(
       "admin:unauthorized",
       () => {
 
         clearAuthentication();
-
 
         showMessage(
           "Your administrator session has expired. Please log in again.",
@@ -741,32 +741,40 @@ No credentials are stored in this file.
     );
 
 
+    /*
+     * ADMIN LOGIN
+     *
+     * IMPORTANT:
+     * Do NOT dispatch auth:login-success here.
+     *
+     * login() already handles that event.
+     */
+
     document.addEventListener(
       "admin:login",
-      event => {
+      () => {
 
-        showDashboardScreen();
-
-
-        document.dispatchEvent(
-          new CustomEvent(
-            "auth:login-success",
-            {
-              detail:
-                event.detail
-            }
-          )
-        );
+        showDashboardScreen({
+          force: true
+        });
 
       }
     );
 
 
+    /*
+     * ADMIN LOGOUT
+     */
+
     document.addEventListener(
       "admin:logout",
       () => {
 
-        showLoginScreen();
+        currentAuthState = null;
+
+        showLoginScreen({
+          force: true
+        });
 
       }
     );
@@ -775,7 +783,7 @@ No credentials are stored in this file.
 
 
   /* ========================================================
-      API
+     PUBLIC API
   ======================================================== */
 
   window.ApplicationAuth = {
@@ -803,11 +811,9 @@ No credentials are stored in this file.
      GLOBAL ALIASES
   ======================================================== */
 
-  window.adminLogin =
-    login;
+  window.adminLogin = login;
 
-  window.adminLogout =
-    logout;
+  window.adminLogout = logout;
 
   window.checkAdminAuthentication =
     checkAuthentication;
@@ -817,27 +823,69 @@ No credentials are stored in this file.
      INITIALIZATION
   ======================================================== */
 
-  document.addEventListener(
-    "DOMContentLoaded",
-    () => {
+  function initializeAuth() {
 
-      bindLoginForm();
+    /*
+     * Set the initial screen once.
+     * Do not repeatedly toggle the DOM.
+     */
 
-      bindLogoutButtons();
+    const hasToken =
+      ADMIN &&
+      ADMIN.isLoggedIn();
 
-      bindAdminEvents();
+    if (hasToken) {
 
-      protectAdminPage();
+      /*
+       * Temporarily show dashboard while
+       * session verification happens.
+       */
 
+      showDashboardScreen({
+        force: true
+      });
 
-      document.dispatchEvent(
-        new CustomEvent(
-          "auth:ready"
-        )
-      );
+    } else {
+
+      showLoginScreen({
+        force: true
+      });
 
     }
-  );
 
+    bindLoginForm();
+
+    bindLogoutButtons();
+
+    bindAdminEvents();
+
+    protectAdminPage();
+
+    document.dispatchEvent(
+      new CustomEvent(
+        "auth:ready"
+      )
+    );
+
+  }
+
+
+  if (
+    document.readyState === "loading"
+  ) {
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      initializeAuth,
+      {
+        once: true
+      }
+    );
+
+  } else {
+
+    initializeAuth();
+
+  }
 
 })();
