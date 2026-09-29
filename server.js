@@ -136,55 +136,31 @@ if (NODE_ENV === "production") {
 /* =========================================================
    CORS
 ========================================================= */
+const cors = require("cors");
 
-const allowedOrigins =
-  (process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+const allowedOrigins = [
+  "https://application-forms-1-yt65.onrender.com"
+];
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin: function (origin, callback) {
 
-      // Requests without an Origin header
+      // Allow server-to-server/no-origin requests
       if (!origin) {
         return callback(null, true);
       }
 
-      // Your Render application
-      if (
-        origin ===
-        "https://application-forms-1-yt65.onrender.com"
-      ) {
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-
-      // Any additional origins configured in Render
-      if (
-        allowedOrigins.includes(origin)
-      ) {
-        return callback(null, true);
-      }
-
-      // Development
-      if (NODE_ENV !== "production") {
-        return callback(null, true);
-      }
-
-      console.warn(
-        "Blocked CORS origin:",
-        origin
-      );
 
       return callback(
-        new Error(
-          "Origin not allowed by CORS."
-        )
+        new Error("Origin not allowed by CORS")
       );
     },
 
-    credentials: false
+    credentials: true
   })
 );
 /* =========================================================
